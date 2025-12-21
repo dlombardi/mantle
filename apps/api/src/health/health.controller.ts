@@ -26,10 +26,8 @@ export class HealthController {
       this.triggerService.healthCheck(),
     ]);
 
-    const allHealthy =
-      supabaseHealth.connected && triggerHealth.configured;
-    const anyUnhealthy =
-      !supabaseHealth.connected && !triggerHealth.configured;
+    const allHealthy = supabaseHealth.connected && triggerHealth.configured;
+    const anyUnhealthy = !supabaseHealth.connected && !triggerHealth.configured;
 
     return {
       status: allHealthy ? 'healthy' : anyUnhealthy ? 'unhealthy' : 'degraded',
