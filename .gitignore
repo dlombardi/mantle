@@ -1,18 +1,24 @@
 # Dependencies
-/node_modules
-/.pnp
+node_modules
+.pnp
 .pnp.js
 .yarn/install-state.gz
 
 # Testing
-/coverage
+coverage
 
 # Next.js
-/.next/
-/out/
+.next/
+out/
+
+# NestJS
+dist/
 
 # Production
-/build
+build
+
+# Turborepo
+.turbo
 
 # Misc
 .DS_Store
