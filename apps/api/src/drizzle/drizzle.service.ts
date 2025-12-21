@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const postgres = require('postgres');
+import type { Sql } from 'postgres';
 import * as schema from '../lib/db/schema';
 
 export type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
@@ -14,7 +16,7 @@ export type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
 @Injectable()
 export class DrizzleService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DrizzleService.name);
-  private client: ReturnType<typeof postgres> | null = null;
+  private client: Sql | null = null;
   private db: DrizzleDB | null = null;
 
   constructor(private readonly configService: ConfigService) {}
@@ -37,7 +39,7 @@ export class DrizzleService implements OnModuleInit, OnModuleDestroy {
     });
 
     // Create Drizzle instance with schema
-    this.db = drizzle(this.client, { schema });
+    this.db = drizzle(this.client!, { schema });
 
     this.logger.log('Drizzle database client initialized');
   }
