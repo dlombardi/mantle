@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { SupabaseService } from '../supabase/supabase.service';
+import { DrizzleService } from '../drizzle/drizzle.service';
 import { TriggerService } from '../trigger/trigger.service';
 
 interface HealthStatus {
@@ -7,7 +7,7 @@ interface HealthStatus {
   timestamp: string;
   version: string;
   services: {
-    supabase: { connected: boolean; error?: string };
+    database: { connected: boolean; error?: string };
     trigger: { configured: boolean };
   };
 }
@@ -15,26 +15,26 @@ interface HealthStatus {
 @Controller('health')
 export class HealthController {
   constructor(
-    private readonly supabaseService: SupabaseService,
+    private readonly drizzleService: DrizzleService,
     private readonly triggerService: TriggerService,
   ) {}
 
   @Get()
   async getHealth(): Promise<HealthStatus> {
-    const [supabaseHealth, triggerHealth] = await Promise.all([
-      this.supabaseService.healthCheck(),
+    const [databaseHealth, triggerHealth] = await Promise.all([
+      this.drizzleService.healthCheck(),
       this.triggerService.healthCheck(),
     ]);
 
-    const allHealthy = supabaseHealth.connected && triggerHealth.configured;
-    const anyUnhealthy = !supabaseHealth.connected && !triggerHealth.configured;
+    const allHealthy = databaseHealth.connected && triggerHealth.configured;
+    const anyUnhealthy = !databaseHealth.connected && !triggerHealth.configured;
 
     return {
       status: allHealthy ? 'healthy' : anyUnhealthy ? 'unhealthy' : 'degraded',
       timestamp: new Date().toISOString(),
       version: '0.1.0',
       services: {
-        supabase: supabaseHealth,
+        database: databaseHealth,
         trigger: triggerHealth,
       },
     };
@@ -47,7 +47,7 @@ export class HealthController {
 
   @Get('ready')
   async getReadiness(): Promise<{ ready: boolean }> {
-    const supabaseHealth = await this.supabaseService.healthCheck();
-    return { ready: supabaseHealth.connected };
+    const databaseHealth = await this.drizzleService.healthCheck();
+    return { ready: databaseHealth.connected };
   }
 }
