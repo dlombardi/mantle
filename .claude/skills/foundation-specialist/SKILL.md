@@ -1,515 +1,332 @@
 ---
 name: foundation-specialist
 description: |
-  Handles Next.js project setup, Supabase configuration, Trigger.dev integration, and database
-  schema/migrations for Reasoning Substrate. Invoke when working on: project initialization,
-  environment configuration, database tables, migrations, TypeScript types from schema,
-  Trigger.dev job scaffolding, or any files in supabase/migrations/, lib/db/, lib/supabase/,
-  or trigger.config.ts.
+  Handles Turborepo monorepo setup, NestJS API configuration, Drizzle ORM schema, Supabase migrations,
+  and Trigger.dev integration for Mantle. Invoke when working on: project initialization, database
+  schema/migrations, environment configuration, Drizzle types, NestJS modules, or files in
+  supabase/migrations/, apps/api/src/lib/db/, apps/api/src/drizzle/, or trigger configuration.
 license: MIT
-compatibility: Next.js 14+, Supabase, Trigger.dev, TypeScript, Node.js 18+
-allowed-tools: Read Write Bash(npm:*) Bash(npx:*) Bash(git:*) Glob Grep
+compatibility: Next.js 14+, NestJS 10+, Drizzle ORM, Supabase, Trigger.dev, Bun, TypeScript
+allowed-tools: Read Write Bash(bun:*) Bash(bunx:*) Bash(git:*) Glob Grep
 metadata:
   role: domain-specialist
   task-count: 9
   critical-path: true
   phase: 1-2
+  status: implemented
 ---
 
 # Foundation Specialist
 
 ## Purpose
 
-Set up core infrastructure: Next.js, Supabase, Trigger.dev, and database schema. This is the foundational layer that all other specialists depend on.
+Set up core infrastructure: Turborepo monorepo with Next.js frontend and NestJS backend, Drizzle ORM for type-safe database access, Supabase for auth and Postgres, and Trigger.dev for background jobs. This is the foundational layer that all other specialists depend on.
+
+## Current Implementation Status
+
+**COMPLETED** - The following has been implemented:
+- [x] Turborepo monorepo with `apps/web` (Next.js) and `apps/api` (NestJS)
+- [x] Drizzle ORM with 12 tables and typed schema
+- [x] 14 Postgres enums for type safety
+- [x] RLS policies with `user_owns_repo()` helper
+- [x] User sync trigger from auth.users
+- [x] NestJS modules: DrizzleModule, SupabaseModule, TriggerModule, HealthModule
+- [x] Environment configuration in `.env.local.example`
 
 ## When to Activate This Skill
 
-- Project initialization requests
-- Database schema or migration work
-- Environment configuration
+- Database schema modifications or new migrations
+- Adding new Drizzle tables or relations
+- NestJS module configuration
 - Trigger.dev job scaffolding
 - Working on files in:
   - `supabase/migrations/*`
-  - `lib/db/*`
-  - `lib/supabase/*`
-  - `trigger.config.ts`
+  - `apps/api/src/lib/db/*`
+  - `apps/api/src/drizzle/*`
+  - `apps/api/drizzle.config.ts`
 
-## Prerequisites
+## Architecture Overview
 
-Before starting, ensure:
-- [ ] Supabase account and project created
-- [ ] Vercel account created
-- [ ] Trigger.dev account created
-- [ ] Environment variables documented in `human-intervention-blockers.md`
-
-## Tasks Owned
-
-| Task ID | Description | Priority |
-|---------|-------------|----------|
-| task-1.1-nextjs-init | Initialize Next.js 14 project | P0 |
-| task-1.2-supabase-setup | Configure Supabase clients | P0 |
-| task-1.3-triggerdev-setup | Initialize Trigger.dev | P0 |
-| task-1.6-core-schema | Create database schema | P0 |
-| task-1.9-env-config | Environment configuration | P0 |
-| task-6.1a-error-fields | Add error fields to status tables | P1 |
-| task-6.2-retry-config | Configure retry logic | P1 |
-| task-6.9-logging | Set up structured logging | P2 |
-
-## Workflow
-
-### Step 1: Project Initialization
-
-1. Create Next.js 14 project with App Router:
-   ```bash
-   npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
-   ```
-
-2. Configure TypeScript strict mode in `tsconfig.json`:
-   ```json
-   {
-     "compilerOptions": {
-       "strict": true,
-       "noUncheckedIndexedAccess": true,
-       "forceConsistentCasingInFileNames": true
-     }
-   }
-   ```
-
-3. Install core dependencies:
-   ```bash
-   npm install @supabase/supabase-js @supabase/ssr zod
-   npm install @anthropic-ai/sdk @octokit/rest @octokit/auth-app
-   npm install -D @types/node
-   ```
-
-4. Create base directory structure:
-   ```
-   src/
-   ├── app/
-   │   ├── api/
-   │   ├── auth/
-   │   └── (dashboard)/
-   ├── components/
-   │   └── ui/
-   ├── lib/
-   │   ├── api/
-   │   ├── db/
-   │   ├── errors/
-   │   ├── supabase/
-   │   └── types/
-   ├── hooks/
-   └── jobs/
-   ```
-
-### Step 2: Supabase Configuration
-
-1. Create `lib/supabase/client.ts` (browser client):
-   ```typescript
-   import { createBrowserClient } from '@supabase/ssr';
-
-   export function createClient() {
-     return createBrowserClient(
-       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-     );
-   }
-   ```
-
-2. Create `lib/supabase/server.ts` (server client):
-   ```typescript
-   import { createServerClient, type CookieOptions } from '@supabase/ssr';
-   import { cookies } from 'next/headers';
-
-   export async function createClient() {
-     const cookieStore = await cookies();
-
-     return createServerClient(
-       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-       {
-         cookies: {
-           get(name: string) {
-             return cookieStore.get(name)?.value;
-           },
-           set(name: string, value: string, options: CookieOptions) {
-             cookieStore.set({ name, value, ...options });
-           },
-           remove(name: string, options: CookieOptions) {
-             cookieStore.set({ name, value: '', ...options });
-           },
-         },
-       }
-     );
-   }
-   ```
-
-3. Create `lib/supabase/admin.ts` (service role client):
-   ```typescript
-   import { createClient } from '@supabase/supabase-js';
-
-   export function createAdminClient() {
-     return createClient(
-       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-       process.env.SUPABASE_SERVICE_ROLE_KEY!,
-       { auth: { persistSession: false } }
-     );
-   }
-   ```
-
-### Step 3: Database Schema
-
-Create migration file `supabase/migrations/001_initial_schema.sql`:
-
-```sql
--- Users (synced from Supabase Auth)
-CREATE TABLE users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id),
-  email TEXT NOT NULL,
-  name TEXT,
-  avatar_url TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Repositories
-CREATE TABLE repos (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  full_name TEXT NOT NULL,
-  installation_id BIGINT NOT NULL,
-  ingestion_status TEXT DEFAULT 'pending' CHECK (ingestion_status IN ('pending', 'ingesting', 'ingested', 'failed')),
-  ingestion_error TEXT,
-  extraction_status TEXT DEFAULT 'pending' CHECK (extraction_status IN ('pending', 'extracting', 'extracted', 'failed')),
-  extraction_error TEXT,
-  token_count INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Patterns
-CREATE TABLE patterns (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  repo_id UUID REFERENCES repos(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('code', 'file-naming', 'file-structure')),
-  status TEXT DEFAULT 'candidate' CHECK (status IN ('candidate', 'authoritative', 'rejected', 'archived')),
-  tier TEXT CHECK (tier IN ('strong', 'moderate', 'weak', 'emerging', 'legacy')),
-  confidence JSONB NOT NULL,
-  health_signals JSONB,
-  severity TEXT CHECK (severity IN ('error', 'warning', 'info')),
-  rationale TEXT,
-  promoted_by UUID REFERENCES users(id),
-  promoted_at TIMESTAMPTZ,
-  rejection_reason TEXT,
-  pr_review_enabled BOOLEAN DEFAULT FALSE,
-  ai_context_enabled BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Pattern Evidence
-CREATE TABLE pattern_evidence (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pattern_id UUID REFERENCES patterns(id) ON DELETE CASCADE,
-  file_path TEXT NOT NULL,
-  start_line INTEGER,
-  end_line INTEGER,
-  content_hash TEXT,
-  author TEXT,
-  commit_sha TEXT,
-  commit_date TIMESTAMPTZ,
-  is_canonical BOOLEAN DEFAULT FALSE,
-  is_stale BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Repo Files (for autocomplete)
-CREATE TABLE repo_files (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  repo_id UUID REFERENCES repos(id) ON DELETE CASCADE,
-  path TEXT NOT NULL,
-  language TEXT,
-  size_bytes INTEGER,
-  UNIQUE(repo_id, path)
-);
-
--- Pull Requests
-CREATE TABLE pull_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  repo_id UUID REFERENCES repos(id) ON DELETE CASCADE,
-  github_pr_id INTEGER NOT NULL,
-  number INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  state TEXT NOT NULL,
-  diff_storage_path TEXT,
-  analysis_status TEXT DEFAULT 'pending',
-  analysis_error TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(repo_id, github_pr_id)
-);
-
--- Violations
-CREATE TABLE violations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pull_request_id UUID REFERENCES pull_requests(id) ON DELETE CASCADE,
-  pattern_id UUID REFERENCES patterns(id) ON DELETE CASCADE,
-  file_path TEXT NOT NULL,
-  line_number INTEGER,
-  description TEXT NOT NULL,
-  severity TEXT NOT NULL,
-  dismissed BOOLEAN DEFAULT FALSE,
-  dismissed_by UUID REFERENCES users(id),
-  dismissed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Pattern Evolution Requests
-CREATE TABLE pattern_evolution_requests (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pattern_id UUID REFERENCES patterns(id) ON DELETE CASCADE,
-  pull_request_id UUID REFERENCES pull_requests(id) ON DELETE CASCADE,
-  evidence_id UUID REFERENCES pattern_evidence(id),
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
-  diff_summary TEXT,
-  reviewed_by UUID REFERENCES users(id),
-  reviewed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Context File Configs
-CREATE TABLE context_file_configs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  repo_id UUID REFERENCES repos(id) ON DELETE CASCADE,
-  format TEXT NOT NULL CHECK (format IN ('claude', 'cursor')),
-  file_path TEXT NOT NULL,
-  enabled BOOLEAN DEFAULT TRUE,
-  last_synced_at TIMESTAMPTZ,
-  UNIQUE(repo_id, format)
-);
-
--- Provenance
-CREATE TABLE provenance (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  pattern_id UUID REFERENCES patterns(id) ON DELETE CASCADE,
-  action TEXT NOT NULL,
-  actor_id UUID REFERENCES users(id),
-  details JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- Indexes
-CREATE INDEX idx_repos_user ON repos(user_id);
-CREATE INDEX idx_patterns_repo ON patterns(repo_id);
-CREATE INDEX idx_patterns_status ON patterns(status);
-CREATE INDEX idx_pattern_evidence_pattern ON pattern_evidence(pattern_id);
-CREATE INDEX idx_violations_pr ON violations(pull_request_id);
-CREATE INDEX idx_violations_pattern ON violations(pattern_id);
-
--- Enable Row Level Security
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE repos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patterns ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pattern_evidence ENABLE ROW LEVEL SECURITY;
-ALTER TABLE repo_files ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pull_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE violations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pattern_evolution_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE context_file_configs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE provenance ENABLE ROW LEVEL SECURITY;
-
--- RLS Policies
-CREATE POLICY "Users can view own profile" ON users FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON users FOR UPDATE USING (auth.uid() = id);
-
-CREATE POLICY "Users can view own repos" ON repos FOR SELECT USING (user_id = auth.uid());
-CREATE POLICY "Users can manage own repos" ON repos FOR ALL USING (user_id = auth.uid());
-
-CREATE POLICY "Users can view patterns in own repos" ON patterns FOR SELECT
-  USING (repo_id IN (SELECT id FROM repos WHERE user_id = auth.uid()));
-CREATE POLICY "Users can manage patterns in own repos" ON patterns FOR ALL
-  USING (repo_id IN (SELECT id FROM repos WHERE user_id = auth.uid()));
-
--- Similar policies for other tables...
+```
+mantle/
+├── apps/
+│   ├── web/                    # Next.js 14 frontend
+│   │   ├── app/                # App Router pages
+│   │   ├── components/         # React components
+│   │   └── lib/                # Frontend utilities
+│   └── api/                    # NestJS backend
+│       ├── src/
+│       │   ├── drizzle/        # DrizzleModule + DrizzleService
+│       │   ├── health/         # Health checks
+│       │   ├── lib/db/         # Schema + types
+│       │   ├── supabase/       # SupabaseModule (auth)
+│       │   └── trigger/        # TriggerModule (jobs)
+│       └── drizzle.config.ts   # Drizzle Kit config
+├── supabase/
+│   ├── config.toml             # Supabase CLI config
+│   └── migrations/             # SQL migrations
+├── turbo.json                  # Turborepo config
+└── .env.local.example          # Environment template
 ```
 
-### Step 4: Generate TypeScript Types
+## Database Schema (12 Tables)
 
-Create `lib/db/types.ts`:
+### Tables
+
+| Table | Purpose | Key Columns |
+|-------|---------|-------------|
+| `users` | Auth sync from Supabase | `id`, `github_id`, `github_username` |
+| `repos` | Repository scope (D5) | `user_id`, `github_id`, `installation_id`, `ingestion_status` |
+| `repo_files` | File inventory | `repo_id`, `file_path`, `language` |
+| `patterns` | Core entity | `repo_id`, `type`, `status`, `confidence_score` (JSONB) |
+| `pattern_evidence` | Code-level evidence | `pattern_id`, `file_path`, `snippet`, `author_username` |
+| `filesystem_pattern_evidence` | Path-only evidence | `pattern_id`, `file_path`, `is_directory` |
+| `context_file_configs` | AI context files | `repo_id`, `format`, `target_path` |
+| `provenance` | Decision history | `pattern_id`, `type`, `url` |
+| `pull_requests` | PR tracking | `repo_id`, `github_pr_number`, `analysis_status` |
+| `violations` | PR violations | `pull_request_id`, `pattern_id`, `severity` |
+| `backtest_violations` | Historical impact | `pattern_id`, `pr_number` |
+| `pattern_evolution_requests` | Evolution tracking | `pattern_id`, `pull_request_id`, `status` |
+
+### Enums (14 Total)
+
 ```typescript
-export type User = {
-  id: string;
-  email: string;
-  name: string | null;
-  avatarUrl: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
+// Status enums
+ingestion_status: 'pending' | 'ingesting' | 'ingested' | 'failed'
+extraction_status: 'pending' | 'extracting' | 'extracted' | 'failed'
+analysis_status: 'pending' | 'analyzing' | 'analyzed' | 'failed' | 'skipped'
+pattern_evolution_status: 'pending' | 'accepted' | 'rejected' | 'historical' | 'cancelled'
 
-export type Repo = {
-  id: string;
-  userId: string;
-  name: string;
-  fullName: string;
-  installationId: number;
-  ingestionStatus: 'pending' | 'ingesting' | 'ingested' | 'failed';
-  ingestionError: string | null;
-  extractionStatus: 'pending' | 'extracting' | 'extracted' | 'failed';
-  extractionError: string | null;
-  tokenCount: number;
-  createdAt: string;
-  updatedAt: string;
-};
+// Pattern enums
+pattern_type: 'structural' | 'behavioral' | 'api' | 'testing' | 'naming' | 'dependency' | 'file-naming' | 'file-structure' | 'other'
+pattern_status: 'candidate' | 'authoritative' | 'rejected' | 'deprecated' | 'deferred'
+confidence_model: 'code' | 'filesystem'
+confidence_tier: 'strong' | 'emerging' | 'moderate' | 'weak' | 'legacy'
 
-export type PatternType = 'code' | 'file-naming' | 'file-structure';
-export type PatternStatus = 'candidate' | 'authoritative' | 'rejected' | 'archived';
-export type PatternTier = 'strong' | 'moderate' | 'weak' | 'emerging' | 'legacy';
-export type Severity = 'error' | 'warning' | 'info';
-
-export type Confidence = {
-  evidence: { instanceCount: number; consistency: number };
-  adoption: { uniqueAuthors: number };
-  establishment: { ageCategory: 'new' | 'recent' | 'established' | 'legacy' };
-  location: { codeCategory: 'core' | 'feature' | 'utility' | 'test' };
-};
-
-export type Pattern = {
-  id: string;
-  repoId: string;
-  name: string;
-  description: string;
-  type: PatternType;
-  status: PatternStatus;
-  tier: PatternTier | null;
-  confidence: Confidence;
-  healthSignals: unknown | null;
-  severity: Severity | null;
-  rationale: string | null;
-  promotedBy: string | null;
-  promotedAt: string | null;
-  rejectionReason: string | null;
-  prReviewEnabled: boolean;
-  aiContextEnabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-// ... additional types
+// Other enums
+violation_severity: 'error' | 'warning' | 'info'
+violation_resolution: 'open' | 'fixed' | 'dismissed'
+provenance_type: 'pull_request' | 'commit' | 'issue' | 'document' | 'slack' | 'adr' | 'other'
+code_category: 'core' | 'feature' | 'frontend' | 'backend' | 'test' | 'config' | 'helper'
+context_file_format: 'claude' | 'cursor'
+context_file_sync_status: 'never' | 'synced' | 'pending'
+evidence_source: 'extraction' | 'human'
 ```
 
-### Step 5: Trigger.dev Setup
+### JSONB Types
 
-1. Install Trigger.dev:
+```typescript
+// 4-dimensional confidence for code patterns (D11)
+interface PatternConfidence {
+  tier: ConfidenceTier;
+  evidence: { instanceCount: number; consistency: 'high' | 'medium' | 'low'; consistencyNote: string | null };
+  adoption: { uniqueAuthors: number; authorUsernames: string[] };
+  establishment: { oldestInstanceDate: string; newestInstanceDate: string; ageCategory: 'established' | 'maturing' | 'emerging' };
+  location: { breakdown: Record<CodeCategory, number>; primary: CodeCategory };
+  insight: string;
+  suggestedActions: string[];
+}
+
+// 2-dimensional confidence for filesystem patterns (D34)
+interface FilesystemPatternConfidence {
+  tier: Exclude<ConfidenceTier, 'legacy'>;
+  evidence: number;
+  adoption: number;
+}
+
+// Health signals (D11)
+interface PatternHealthSignals {
+  hasWarnings: boolean;
+  signals: HealthSignal[];
+}
+
+// Enforcement settings (D30)
+interface PatternEnforcement {
+  prReview: boolean;
+  aiContext: boolean;
+}
+```
+
+## Key Files
+
+### Drizzle Schema
+**Location:** `apps/api/src/lib/db/schema.ts`
+
+Defines all 12 tables with:
+- Proper foreign key relationships with CASCADE deletes
+- Indexes for common query patterns
+- JSONB columns with TypeScript type annotations
+- Drizzle relations for query builder
+
+### Drizzle Types
+**Location:** `apps/api/src/lib/db/types.ts`
+
+Contains:
+- Enum arrays with `as const` for type inference
+- TypeScript types derived from enums
+- JSONB interface definitions
+- Confidence tier thresholds
+
+### DrizzleService
+**Location:** `apps/api/src/drizzle/drizzle.service.ts`
+
+NestJS injectable providing:
+- Typed Drizzle database instance via `getDb()`
+- Health check via `healthCheck()`
+- Connection lifecycle management
+
+### Migrations
+**Location:** `supabase/migrations/`
+
+- `0000_*.sql` - Schema DDL generated by Drizzle Kit
+- `0001_rls_policies.sql` - RLS policies + user sync trigger
+
+## Workflows
+
+### Adding a New Table
+
+1. Define table in `apps/api/src/lib/db/schema.ts`:
+   ```typescript
+   export const newTable = pgTable('new_table', {
+     id: uuid('id').primaryKey().defaultRandom(),
+     repoId: uuid('repo_id').notNull().references(() => repos.id, { onDelete: 'cascade' }),
+     // ... columns
+   }, (table) => [
+     index('idx_new_table_repo').on(table.repoId),
+   ]);
+   ```
+
+2. Add relations if needed:
+   ```typescript
+   export const newTableRelations = relations(newTable, ({ one }) => ({
+     repo: one(repos, { fields: [newTable.repoId], references: [repos.id] }),
+   }));
+   ```
+
+3. Generate migration:
    ```bash
-   npm install @trigger.dev/sdk @trigger.dev/nextjs
+   cd apps/api && bunx drizzle-kit generate
    ```
 
-2. Create `trigger.config.ts`:
+4. Push to Supabase:
+   ```bash
+   bunx supabase db push
+   ```
+
+### Adding a New Enum
+
+1. Add to `apps/api/src/lib/db/types.ts`:
    ```typescript
-   import { defineConfig } from '@trigger.dev/sdk/v3';
-
-   export default defineConfig({
-     project: 'reasoning-substrate',
-     runtime: 'node',
-     logLevel: 'info',
-     retries: {
-       enabledInDev: true,
-       default: {
-         maxAttempts: 3,
-         minTimeoutInMs: 1000,
-         maxTimeoutInMs: 30000,
-         factor: 2,
-       },
-     },
-   });
+   export const newStatusEnum = ['pending', 'active', 'completed'] as const;
+   export type NewStatus = (typeof newStatusEnum)[number];
    ```
 
-3. Create `jobs/index.ts` scaffold:
+2. Add to schema:
    ```typescript
-   // Job exports will be added by domain specialists
-   export * from './ingest-repo';
-   export * from './extract-patterns';
-   export * from './analyze-pr';
-   export * from './sync-context-files';
+   export const newStatus = pgEnum('new_status', newStatusEnum);
    ```
 
-### Step 6: Environment Configuration
+3. Generate and push migration.
 
-Create `.env.example`:
+### Testing Database Connection
+
+```bash
+# Start API in dev mode
+cd apps/api && bun run dev
+
+# Check health endpoint
+curl http://localhost:3001/api/health | jq .
+```
+
+Expected response:
+```json
+{
+  "status": "degraded",
+  "services": {
+    "database": { "connected": true },
+    "trigger": { "configured": false }
+  }
+}
+```
+
+## Environment Variables
+
+**Location:** `.env.local.example`
+
 ```env
+# URLs
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:3001
+CORS_ORIGIN=http://localhost:3000
+
 # Supabase
+SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
+# Database (Drizzle connection)
+DATABASE_URL=postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
+
 # GitHub App
 GITHUB_APP_ID=
 GITHUB_APP_PRIVATE_KEY=
-GITHUB_WEBHOOK_SECRET=
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
+GITHUB_WEBHOOK_SECRET=
+
+# Trigger.dev
+TRIGGER_SECRET_KEY=
+TRIGGER_API_URL=https://api.trigger.dev
 
 # Anthropic
 ANTHROPIC_API_KEY=
 
-# App
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-
-# Trigger.dev
-TRIGGER_SECRET_KEY=
+# API Server
+PORT=3001
 ```
 
-## Output Specification
+## Validation Commands
 
-After running this skill, the following should exist:
+```bash
+# TypeScript check
+bun run typecheck
 
-### Project Structure
+# Build both apps
+bun run build
+
+# Lint
+bun run lint
+
+# Push migrations
+bunx supabase db push
+
+# Generate new migration from schema changes
+cd apps/api && bunx drizzle-kit generate
 ```
-├── src/
-│   ├── app/
-│   ├── components/
-│   ├── lib/
-│   │   ├── db/types.ts
-│   │   ├── supabase/client.ts
-│   │   ├── supabase/server.ts
-│   │   └── supabase/admin.ts
-│   ├── hooks/
-│   └── jobs/
-├── supabase/
-│   └── migrations/001_initial_schema.sql
-├── trigger.config.ts
-├── .env.example
-└── package.json
-```
-
-### Validation Checks
-- [ ] TypeScript compiles without errors: `npx tsc --noEmit`
-- [ ] Migrations can be applied: `npx supabase db push`
-- [ ] Supabase client connects: verify in browser console
-- [ ] Trigger.dev initialized: `npx trigger.dev dev`
-
-## Error Handling
-
-| Error | Resolution |
-|-------|------------|
-| Missing environment variables | Check `.env.example`, verify all required vars set |
-| Migration conflicts | Provide rollback SQL, check for conflicting changes |
-| Supabase connection fails | Verify project URL and keys, check project status |
-| TypeScript errors | Run `npx tsc --noEmit` to identify issues |
 
 ## Key Decisions Referenced
 
 | ID | Decision | Impact |
 |----|----------|--------|
 | D5 | Multi-repo from day 1 | `repoId` is FK on all tables |
-| D6 | Own database | Using Supabase Postgres |
-| D7 | Tech stack selection | Next.js + Supabase + Trigger.dev |
-| D15 | No token storage | Only store `installationId` |
+| D6 | Own database | Using Supabase Postgres with Drizzle ORM |
+| D7 | Tech stack | Turborepo + Next.js + NestJS + Supabase + Trigger.dev |
+| D11 | 4-dimension confidence | JSONB `confidence_score` with evidence, adoption, establishment, location |
+| D15 | No token storage | Only store `installationId`, generate tokens on-demand |
+| D34 | Filesystem confidence | 2-dimension scoring for file patterns |
+
+## RLS Security Model
+
+All tables have RLS enabled with:
+
+1. **User ownership** - Users can only access their own data
+2. **Repo scoping** - Data scoped through `user_owns_repo(repo_id)` helper function
+3. **Service role bypass** - Backend jobs use service role for system operations
+4. **User sync trigger** - Automatically creates user record from `auth.users`
 
 ## Handoffs
 
-- **After schema complete** → github-integration-specialist can implement auth
-- **After Trigger.dev ready** → ingestion/extraction specialists can create jobs
-- **Patterns from** → backend-architect for error handling, logging patterns
+- **After schema complete** → `github-integration-specialist` can implement OAuth
+- **After Trigger.dev ready** → `ingestion-specialist` and `extraction-specialist` can create jobs
+- **Patterns from** → `backend-architect` for API conventions, error handling
