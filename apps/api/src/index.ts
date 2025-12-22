@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import { closeDb } from './lib/db';
 
 const app = new Hono().basePath('/api');
 
@@ -25,6 +26,17 @@ app.get('/', (c) => {
 // Health routes will be added in TASK 1.5
 
 const port = parseInt(process.env.PORT ?? '3001', 10);
+
+// Graceful shutdown
+async function shutdown() {
+  console.log('\n🛑 Shutting down gracefully...');
+  await closeDb();
+  console.log('✅ Database connections closed');
+  process.exit(0);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 console.log(`🚀 Mantle API running on http://localhost:${port}`);
 
