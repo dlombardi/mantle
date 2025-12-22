@@ -2,6 +2,10 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { closeDb } from './lib/db';
+import { initTrigger } from './lib/trigger';
+
+// Initialize Trigger.dev SDK
+initTrigger();
 
 const app = new Hono().basePath('/api');
 
