@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { closeDb } from './lib/db';
 import { initTrigger } from './lib/trigger';
+import { healthRoutes } from './routes/health';
 
 // Initialize Trigger.dev SDK
 initTrigger();
@@ -27,7 +28,8 @@ app.get('/', (c) => {
   });
 });
 
-// Health routes will be added in TASK 1.5
+// Health check routes
+app.route('/health', healthRoutes);
 
 const port = parseInt(process.env.PORT ?? '3001', 10);
 
