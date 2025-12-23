@@ -251,13 +251,36 @@ function ReposPage() {
 
 ## Testing
 
-- **Test runner**: Bun test (API) / Vitest (Web)
-- **Component tests**: React Testing Library
+| Layer | Framework | Location |
+|-------|-----------|----------|
+| **Unit/Integration** | Vitest | `apps/*/src/**/*.test.ts` |
+| **Components** | React Testing Library + jsdom | `apps/web/src/**/*.test.tsx` |
+| **E2E** | Playwright | `e2e/*.spec.ts` |
+| **Shared Mocks** | @mantle/test-utils | `packages/test-utils/` |
+
 - **Coverage target**: 80% for business logic
 - **Mock boundary**: External APIs (GitHub, Anthropic, Supabase)
+- **API testing**: Uses Zod response schemas for type-safe assertions
 
 ```bash
-bun test              # Run all tests
-bun test --watch      # Watch mode
-bun run test:coverage # Coverage report
+# Unit/Integration tests (via Turbo)
+bun run test              # Run all tests
+bun run test:coverage     # With coverage report
+
+# E2E tests (Playwright)
+bun run test:e2e          # Run Playwright tests
+bun run test:e2e:ui       # Playwright UI mode
+bun run test:e2e:headed   # See browser
+
+# Combined
+bun run test:all          # Unit + E2E
 ```
+
+### Test Configuration
+
+| Config | Location |
+|--------|----------|
+| API Vitest | `apps/api/vitest.config.ts` |
+| Web Vitest | `apps/web/vitest.config.ts` |
+| Playwright | `playwright.config.ts` (root) |
+| Turbo tasks | `turbo.json` |

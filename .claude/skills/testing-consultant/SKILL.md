@@ -25,10 +25,13 @@ Invoke this skill when working on:
 - "Improve test coverage for the API routes"
 
 **Key files:**
-- `**/*.test.ts`, `**/*.spec.ts`
-- `apps/*/vitest.config.ts`
-- `apps/*/playwright.config.ts`
-- `e2e/`
+- `apps/*/src/**/*.test.ts` - Unit tests (co-located)
+- `apps/api/vitest.config.ts` - API Vitest config
+- `apps/web/vitest.config.ts` - Web Vitest config
+- `playwright.config.ts` - E2E config (root, dual webServer)
+- `e2e/*.spec.ts` - E2E test specs
+- `e2e/pages/*.ts` - Page Object Models
+- `packages/test-utils/` - Shared mocks and factories
 
 ---
 
@@ -61,28 +64,35 @@ bun run test && bd complete <id>
 
 ### File Structure
 ```
-apps/
-├── api/
-│   └── src/
-│       ├── routes/
-│       │   ├── health.ts
-│       │   └── health.test.ts      # Co-located
-│       └── services/
-│           ├── user.ts
-│           └── user.test.ts        # Co-located
-└── web/
-    └── src/
-        ├── components/
-        │   ├── Button.tsx
-        │   └── Button.test.tsx     # Co-located
-        └── hooks/
-            ├── use-auth.ts
-            └── use-auth.test.ts    # Co-located
-e2e/
-├── auth.spec.ts                    # E2E tests separate
-├── settings.spec.ts
-└── fixtures/
-    └── test-user.ts
+mantle/
+├── apps/
+│   ├── api/
+│   │   ├── vitest.config.ts        # API test config
+│   │   └── src/
+│   │       ├── test/
+│   │       │   └── setup.ts        # Mocks for db, trigger
+│   │       └── routes/
+│   │           ├── health.ts       # Route + Zod schemas
+│   │           └── health.test.ts  # Co-located tests
+│   └── web/
+│       ├── vitest.config.ts        # Web test config (jsdom)
+│       └── src/
+│           ├── test/
+│           │   ├── setup.ts        # Supabase mock
+│           │   └── test-utils.tsx  # Custom render wrapper
+│           └── lib/
+│               └── supabase.test.ts
+├── packages/
+│   └── test-utils/                 # Shared test utilities
+│       └── src/
+│           ├── mocks/supabase.ts   # createMockSupabaseClient
+│           └── factories/          # User, pattern, repo factories
+├── e2e/
+│   ├── health.spec.ts              # E2E tests
+│   └── pages/
+│       ├── BasePage.ts             # Page Object Model base
+│       └── HomePage.ts
+└── playwright.config.ts            # Dual webServer (API + Web)
 ```
 
 ### Test Pyramid
@@ -182,46 +192,59 @@ describe('Button', () => {
 
 ## API Test Patterns
 
-### Hono Route Testing
+### Hono Route Testing with Zod Schemas
+
+Use Zod schemas for type-safe response validation (eliminates `as` assertions):
+
 ```typescript
-import { describe, it, expect, beforeAll } from 'vitest';
-import { testClient } from 'hono/testing';
-import { app } from '../index';
+// routes/health.ts - Export Zod schemas alongside routes
+import { z } from 'zod';
 
-describe('GET /api/health', () => {
-  const client = testClient(app);
+export const liveResponseSchema = z.object({ status: z.literal('ok') });
+export type LiveResponse = z.infer<typeof liveResponseSchema>;
 
-  it('should return 200 with status', async () => {
-    const res = await client.api.health.$get();
+// routes/health.test.ts
+import { describe, it, expect, vi } from 'vitest';
+import { Hono } from 'hono';
+import { healthRoutes, liveResponseSchema, healthResponseSchema } from './health';
+import { dbHealthCheck } from '@/lib/db';
+import { isTriggerConfigured } from '@/lib/trigger';
+
+vi.mock('@/lib/db');
+vi.mock('@/lib/trigger');
+
+describe('Health Routes', () => {
+  const app = new Hono().route('/health', healthRoutes);
+
+  it('GET /health/live returns ok status', async () => {
+    const res = await app.request('/health/live');
 
     expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data).toHaveProperty('status', 'ok');
-  });
-});
-
-describe('POST /api/users', () => {
-  it('should create user with valid data', async () => {
-    const res = await client.api.users.$post({
-      json: { email: 'test@example.com', name: 'Test User' },
-    });
-
-    expect(res.status).toBe(201);
-    const data = await res.json();
-    expect(data.data).toHaveProperty('id');
+    // Zod parse provides runtime validation + type inference
+    const data = liveResponseSchema.parse(await res.json());
+    expect(data.status).toBe('ok');
   });
 
-  it('should return 400 for invalid email', async () => {
-    const res = await client.api.users.$post({
-      json: { email: 'invalid', name: 'Test' },
-    });
+  it('GET /health returns healthy when services are up', async () => {
+    vi.mocked(dbHealthCheck).mockResolvedValue({ connected: true });
+    vi.mocked(isTriggerConfigured).mockReturnValue(true);
 
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error.code).toBe('VALIDATION_ERROR');
+    const res = await app.request('/health');
+    const data = healthResponseSchema.parse(await res.json());
+
+    expect(data.status).toBe('healthy');
+    expect(data.services.database.connected).toBe(true);
+    expect(data.services.trigger.configured).toBe(true);
   });
 });
 ```
+
+### Key Pattern: Zod as Single Source of Truth
+
+- Export schemas from route files
+- Tests use `schema.parse()` instead of `as` type assertions
+- Runtime validation catches API contract violations
+- TypeScript infers types from schemas automatically
 
 ---
 
@@ -287,9 +310,12 @@ test('user can sign in', async ({ page }) => {
 });
 ```
 
-### Playwright Config
+### Playwright Config (Dual WebServer)
+
+Our config starts both API and Web servers for full-stack E2E testing:
+
 ```typescript
-// playwright.config.ts
+// playwright.config.ts (root)
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
@@ -298,23 +324,40 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: 'html',
+  reporter: [['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
-  webServer: {
-    command: 'bun run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-  },
+  // Dual webServer: start API first, then Web
+  webServer: [
+    {
+      command: 'bun run dev',
+      cwd: './apps/api',
+      url: 'http://localhost:3001/api/health/live',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+    },
+    {
+      command: 'bun run dev',
+      cwd: './apps/web',
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+    },
+  ],
 });
 ```
+
+**Key Points:**
+- Array syntax for `webServer` starts both servers
+- API server starts first (port 3001), then Web (port 3000)
+- Health endpoint URL used to verify API is ready
+- `reuseExistingServer` allows running tests against already-running dev servers
 
 ---
 
@@ -406,15 +449,21 @@ const user = createUser({ name: 'Test User' });
 ## Validation Commands
 
 ```bash
-# Unit/Integration tests
+# Unit/Integration tests (via Turbo)
 bun run test              # Run all tests
-bun run test --watch      # Watch mode
-bun run test --coverage   # Coverage report
+bun run test:coverage     # With coverage report
 
 # E2E tests
 bun run test:e2e          # Run Playwright tests
-bun run test:e2e --ui     # Playwright UI mode
-bun run test:e2e --debug  # Debug mode
+bun run test:e2e:ui       # Playwright UI mode
+bun run test:e2e:headed   # See browser
+
+# Combined
+bun run test:all          # Unit + E2E
+
+# Per-app (without Turbo)
+cd apps/api && bun run test --watch
+cd apps/web && bun run test --watch
 ```
 
 ---

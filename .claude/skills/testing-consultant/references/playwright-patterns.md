@@ -4,16 +4,15 @@ End-to-end testing patterns using Playwright.
 
 ## Test Location
 
-E2E tests are in a separate directory:
+E2E tests are at the repo root:
 ```
-e2e/
-├── auth.spec.ts
-├── settings.spec.ts
-├── pages/              # Page Object Models
-│   ├── LoginPage.ts
-│   └── SettingsPage.ts
-└── fixtures/
-    └── test-user.ts
+mantle/
+├── e2e/
+│   ├── health.spec.ts     # Health check tests
+│   └── pages/             # Page Object Models
+│       ├── BasePage.ts    # Abstract base class
+│       └── HomePage.ts    # Home page POM
+└── playwright.config.ts   # Dual webServer config
 ```
 
 ## Basic Test Structure
@@ -133,10 +132,12 @@ await expect(locator).toBeDisabled();
 await expect(locator).toHaveValue('value');
 ```
 
-## Playwright Config
+## Playwright Config (Dual WebServer)
+
+Our config starts both API and Web servers:
 
 ```typescript
-// playwright.config.ts
+// playwright.config.ts (root)
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
@@ -144,27 +145,46 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: 'html',
+  workers: process.env.CI ? 1 : undefined,
+  reporter: [['html', { open: 'never' }]],
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
-  webServer: {
-    command: 'bun run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-  },
+  // Dual webServer: start API first, then Web
+  webServer: [
+    {
+      command: 'bun run dev',
+      cwd: './apps/api',
+      url: 'http://localhost:3001/api/health/live',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+    },
+    {
+      command: 'bun run dev',
+      cwd: './apps/web',
+      url: 'http://localhost:3000',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120000,
+    },
+  ],
 });
 ```
+
+Key points:
+- Array syntax for `webServer` starts both servers
+- API uses health endpoint to verify readiness
+- `reuseExistingServer` allows testing against running dev servers
 
 ## Running E2E Tests
 
 ```bash
 bun run test:e2e          # Run all E2E tests
-bun run test:e2e --ui     # Playwright UI mode
-bun run test:e2e --debug  # Debug mode
-bun run test:e2e --headed # See browser
+bun run test:e2e:ui       # Playwright UI mode
+bun run test:e2e:headed   # See browser
+bun run test:all          # Unit + E2E combined
 ```

@@ -97,10 +97,44 @@ expect(mockFn).toHaveBeenCalledTimes(3);
 
 ### Mock Modules
 ```typescript
-vi.mock('@/lib/db/client', () => ({
-  getDb: vi.fn(() => mockDb),
+vi.mock('@/lib/db', () => ({
+  getDb: vi.fn(),
+  closeDb: vi.fn(),
+  dbHealthCheck: vi.fn().mockResolvedValue({ connected: true }),
+}));
+
+vi.mock('@/lib/trigger', () => ({
+  initTrigger: vi.fn(),
+  isTriggerConfigured: vi.fn().mockReturnValue(true),
 }));
 ```
+
+## API Response Testing with Zod
+
+Use Zod schemas for type-safe response validation:
+
+```typescript
+// Route exports schemas
+import { z } from 'zod';
+export const responseSchema = z.object({
+  status: z.literal('ok'),
+  data: z.object({ id: z.string() }),
+});
+
+// Test uses schema.parse()
+import { responseSchema } from './route';
+
+it('returns valid response', async () => {
+  const res = await app.request('/endpoint');
+  const data = responseSchema.parse(await res.json());
+  expect(data.status).toBe('ok');
+});
+```
+
+Benefits:
+- No `as` type assertions needed
+- Runtime validation catches API contract violations
+- TypeScript infers types from schemas automatically
 
 ### Spy on Methods
 ```typescript
@@ -126,23 +160,36 @@ it('should handle errors', async () => {
 
 ## Test Data Factories
 
+Located in `packages/test-utils/`:
+
 ```typescript
-// tests/factories/pattern.ts
+// packages/test-utils/src/factories/pattern.ts
 import { faker } from '@faker-js/faker';
 
 export function createPattern(overrides = {}) {
   return {
     id: faker.string.uuid(),
+    repoId: faker.string.uuid(),
     name: faker.lorem.words(3),
-    description: faker.lorem.sentence(),
-    status: 'candidate',
+    description: faker.lorem.paragraph(),
+    status: 'candidate' as const,
+    tier: 1,
+    confidenceEvidence: faker.number.float({ min: 0, max: 1 }),
+    confidenceAdoption: faker.number.float({ min: 0, max: 1 }),
+    confidenceEstablishment: faker.number.float({ min: 0, max: 1 }),
+    confidenceLocation: faker.number.float({ min: 0, max: 1 }),
+    extractedAt: faker.date.past().toISOString(),
     createdAt: faker.date.past().toISOString(),
     ...overrides,
   };
 }
 
 // Usage
-const pattern = createPattern({ status: 'authoritative' });
+import { createPattern, createUser, createRepo } from '@mantle/test-utils';
+
+const pattern = createPattern({ status: 'authoritative', tier: 3 });
+const user = createUser({ name: 'Test User' });
+const repo = createRepo({ defaultBranch: 'develop' });
 ```
 
 ## Running Tests
