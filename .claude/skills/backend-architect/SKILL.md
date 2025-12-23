@@ -16,6 +16,13 @@ Invoke this skill when working on:
 
 **Trigger keywords:** `service`, `job`, `trigger`, `error`, `repository`, `API design`
 
+**Example triggers:**
+- "Create a service to handle pattern promotion"
+- "Add error handling for the GitHub API calls"
+- "Implement a background job for repo ingestion"
+- "Design the API for user preferences"
+- "Add retry logic with exponential backoff"
+
 **Key files:**
 - `apps/api/src/services/`
 - `apps/api/src/jobs/`

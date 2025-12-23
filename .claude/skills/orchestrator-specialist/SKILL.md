@@ -13,6 +13,13 @@ Invoke this skill when:
 - Breaking down a large task into subtasks
 - Managing dependencies between work items
 
+**Example triggers:**
+- "Help me plan the user authentication feature"
+- "Which skill should handle adding a new API endpoint?"
+- "Break down the pattern validation feature into tasks"
+- "I need to add a new page with API backend - where do I start?"
+- "Create a bead for the settings page implementation"
+
 ---
 
 ## Task Routing Decision Tree

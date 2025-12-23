@@ -16,6 +16,13 @@ Invoke this skill when working on:
 
 **Trigger keywords:** `component`, `useState`, `useQuery`, `tsx`, `props`, `hook`, `route`, `navigate`
 
+**Example triggers:**
+- "Create a PatternCard component for displaying patterns"
+- "Add a new route for the settings page"
+- "Implement URL search params for filtering patterns"
+- "Build a form for editing user preferences"
+- "Add loading and error states to the pattern list"
+
 **Key files:**
 - `apps/web/src/routes/`
 - `apps/web/src/components/`

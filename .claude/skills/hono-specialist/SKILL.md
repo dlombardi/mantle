@@ -15,6 +15,13 @@ Invoke this skill when working on:
 
 **Trigger keywords:** `route`, `middleware`, `handler`, `app.`, `c.json`, `c.req`, `Hono`
 
+**Example triggers:**
+- "Add a new API route for user preferences"
+- "Create middleware for authentication"
+- "Add Zod validation to the patterns endpoint"
+- "Implement the PATCH route for updating patterns"
+- "Fix the error response format in the health route"
+
 **Key files:**
 - `apps/api/src/routes/`
 - `apps/api/src/middleware/`

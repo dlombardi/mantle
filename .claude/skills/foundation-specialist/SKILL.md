@@ -15,6 +15,13 @@ Invoke this skill when working on:
 - Environment variable management
 - Build tooling and scripts
 
+**Example triggers:**
+- "Add a new table for user preferences"
+- "Create a migration for the patterns table"
+- "Fix the TypeScript path aliases"
+- "Add RLS policies for the new table"
+- "Configure ESLint for the web app"
+
 **Key files:**
 - `turbo.json`, `package.json` (root)
 - `tsconfig.json`, `tsconfig.*.json`

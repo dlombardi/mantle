@@ -17,6 +17,13 @@ Invoke this skill when working on:
 
 **Trigger keywords:** `test`, `spec`, `mock`, `fixture`, `vitest`, `expect`, `coverage`, `playwright`, `e2e`
 
+**Example triggers:**
+- "Write tests for the pattern service"
+- "Add E2E tests for the login flow"
+- "Create a mock for the Supabase client"
+- "Fix the flaky test in patterns.test.ts"
+- "Improve test coverage for the API routes"
+
 **Key files:**
 - `**/*.test.ts`, `**/*.spec.ts`
 - `apps/*/vitest.config.ts`
