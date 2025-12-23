@@ -1,9 +1,12 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import { HTTPException } from 'hono/http-exception';
+import { ZodError } from 'zod';
 import { closeDb } from './lib/db';
 import { initTrigger } from './lib/trigger';
 import { healthRoutes } from './routes/health';
+import { exampleRoutes } from './routes/example';
 
 // Initialize Trigger.dev SDK
 initTrigger();
@@ -30,6 +33,54 @@ app.get('/', (c) => {
 
 // Health check routes
 app.route('/health', healthRoutes);
+
+// Example routes (demonstrates validation patterns)
+app.route('/example', exampleRoutes);
+
+// Global error handler
+app.onError((err, c) => {
+  // Handle Zod validation errors
+  if (err instanceof ZodError) {
+    return c.json(
+      {
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Request validation failed',
+          details: err.errors.map((e) => ({
+            path: e.path.join('.'),
+            message: e.message,
+          })),
+        },
+      },
+      400
+    );
+  }
+
+  // Handle HTTP exceptions
+  if (err instanceof HTTPException) {
+    return c.json(
+      {
+        error: {
+          code: 'HTTP_ERROR',
+          message: err.message,
+        },
+      },
+      err.status
+    );
+  }
+
+  // Handle unexpected errors
+  console.error('Unhandled error:', err);
+  return c.json(
+    {
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'An unexpected error occurred',
+      },
+    },
+    500
+  );
+});
 
 const port = parseInt(process.env.PORT ?? '3001', 10);
 
