@@ -8,8 +8,39 @@
  */
 
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { dbHealthCheck } from '../lib/db';
 import { isTriggerConfigured } from '../lib/trigger';
+
+// Response schemas - single source of truth for types
+export const liveResponseSchema = z.object({
+  status: z.literal('ok'),
+});
+
+export const readyResponseSchema = z.object({
+  ready: z.boolean(),
+  error: z.string().optional(),
+});
+
+export const healthResponseSchema = z.object({
+  status: z.enum(['healthy', 'degraded', 'unhealthy']),
+  timestamp: z.string(),
+  version: z.string(),
+  services: z.object({
+    database: z.object({
+      connected: z.boolean(),
+      error: z.string().optional(),
+    }),
+    trigger: z.object({
+      configured: z.boolean(),
+    }),
+  }),
+});
+
+// Infer types from schemas
+export type LiveResponse = z.infer<typeof liveResponseSchema>;
+export type ReadyResponse = z.infer<typeof readyResponseSchema>;
+export type HealthResponse = z.infer<typeof healthResponseSchema>;
 
 export const healthRoutes = new Hono();
 
@@ -31,7 +62,7 @@ healthRoutes.get('/', async (c) => {
       : 'degraded'
     : 'unhealthy';
 
-  return c.json({
+  const response: HealthResponse = {
     status,
     timestamp: new Date().toISOString(),
     version: '0.1.0',
@@ -39,7 +70,9 @@ healthRoutes.get('/', async (c) => {
       database: dbHealth,
       trigger: triggerHealth,
     },
-  });
+  };
+
+  return c.json(response);
 });
 
 /**
@@ -47,7 +80,8 @@ healthRoutes.get('/', async (c) => {
  * Always returns ok unless the process has crashed.
  */
 healthRoutes.get('/live', (c) => {
-  return c.json({ status: 'ok' });
+  const response: LiveResponse = { status: 'ok' };
+  return c.json(response);
 });
 
 /**
@@ -58,8 +92,10 @@ healthRoutes.get('/ready', async (c) => {
   const dbHealth = await dbHealthCheck();
 
   if (!dbHealth.connected) {
-    return c.json({ ready: false, error: dbHealth.error }, 503);
+    const response: ReadyResponse = { ready: false, error: dbHealth.error };
+    return c.json(response, 503);
   }
 
-  return c.json({ ready: true });
+  const response: ReadyResponse = { ready: true };
+  return c.json(response);
 });
