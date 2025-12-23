@@ -20,7 +20,7 @@ app.use(
   cors({
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     credentials: true,
-  })
+  }),
 );
 
 // Root endpoint
@@ -52,7 +52,7 @@ app.onError((err, c) => {
           })),
         },
       },
-      400
+      400,
     );
   }
 
@@ -65,7 +65,7 @@ app.onError((err, c) => {
           message: err.message,
         },
       },
-      err.status
+      err.status,
     );
   }
 
@@ -78,7 +78,7 @@ app.onError((err, c) => {
         message: 'An unexpected error occurred',
       },
     },
-    500
+    500,
   );
 });
 

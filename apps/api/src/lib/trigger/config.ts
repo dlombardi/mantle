@@ -18,7 +18,7 @@ export function initTrigger(): void {
 
   if (!secretKey) {
     console.warn(
-      '⚠️  TRIGGER_SECRET_KEY not configured - background jobs disabled'
+      '⚠️  TRIGGER_SECRET_KEY not configured - background jobs disabled',
     );
     return;
   }

@@ -25,7 +25,7 @@ export function getSupabaseClient(): SupabaseClient {
 
     if (!key) {
       throw new Error(
-        'SUPABASE_SERVICE_ROLE_KEY environment variable is not configured'
+        'SUPABASE_SERVICE_ROLE_KEY environment variable is not configured',
       );
     }
 

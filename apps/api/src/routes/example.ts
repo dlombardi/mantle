@@ -19,36 +19,28 @@ export const exampleRoutes = new Hono();
  * GET /api/example
  * Demonstrates query parameter validation with pagination.
  */
-exampleRoutes.get(
-  '/',
-  zValidator('query', paginationSchema),
-  async (c) => {
-    const { page, limit } = c.req.valid('query');
+exampleRoutes.get('/', zValidator('query', paginationSchema), async (c) => {
+  const { page, limit } = c.req.valid('query');
 
-    return c.json({
-      message: 'Paginated list example',
-      pagination: { page, limit, total: 100 },
-      items: [],
-    });
-  }
-);
+  return c.json({
+    message: 'Paginated list example',
+    pagination: { page, limit, total: 100 },
+    items: [],
+  });
+});
 
 /**
  * GET /api/example/:id
  * Demonstrates path parameter validation.
  */
-exampleRoutes.get(
-  '/:id',
-  zValidator('param', idParamSchema),
-  async (c) => {
-    const { id } = c.req.valid('param');
+exampleRoutes.get('/:id', zValidator('param', idParamSchema), async (c) => {
+  const { id } = c.req.valid('param');
 
-    return c.json({
-      message: 'Single resource example',
-      id,
-    });
-  }
-);
+  return c.json({
+    message: 'Single resource example',
+    id,
+  });
+});
 
 /**
  * POST /api/example/connect
@@ -64,5 +56,5 @@ exampleRoutes.post(
       message: 'Validated request body',
       data: body,
     });
-  }
+  },
 );
