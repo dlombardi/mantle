@@ -1,6 +1,6 @@
 # Backend Architect
 
-Establishes backend architecture patterns: API design, error handling, database access, background jobs, and service layer conventions.
+Establishes backend architecture patterns: Hono API design, error handling, Drizzle ORM database access, background jobs, and service layer conventions.
 
 ---
 
@@ -11,7 +11,7 @@ Invoke this skill when working on:
 - Error handling patterns and error classes
 - Service layer architecture
 - Background job patterns (Trigger.dev)
-- Database query patterns and helpers
+- Database query patterns with Drizzle ORM
 - External API integration (GitHub, Anthropic)
 
 **Trigger keywords:** `service`, `job`, `trigger`, `error`, `repository`, `API design`
@@ -20,7 +20,7 @@ Invoke this skill when working on:
 - `apps/api/src/services/`
 - `apps/api/src/jobs/`
 - `apps/api/src/lib/errors/`
-- `apps/api/src/lib/api/`
+- `apps/api/src/lib/db/`
 
 ---
 
@@ -33,7 +33,7 @@ bd create "Implement user preferences service"
 bd update <id> -s in-progress
 
 # Track job implementation
-bd create "Add background job for email notifications"
+bd create "Add background job for notifications"
 bd dep add <job-id> <service-id>  # Job depends on service
 
 # Complete when tested
@@ -42,340 +42,393 @@ bun run test && bd complete <id>
 
 ---
 
-## Prerequisites
+## Tech Stack
 
-- Supabase project configured (via foundation-specialist)
-- Trigger.dev initialized
-- TypeScript strict mode enabled
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| Runtime | Bun | Fast JS runtime |
+| Framework | Hono | Lightweight web framework |
+| ORM | Drizzle | Type-safe database queries |
+| Validation | Zod + @hono/zod-validator | Runtime validation |
+| Jobs | Trigger.dev | Background job processing |
+| Auth/Realtime | Supabase client | Auth, storage, realtime only |
 
-## Workflow
+---
 
-### Step 1: Establish API Conventions
+## API Response Patterns
 
-1. Create `docs/backend/api-conventions.md`
-2. Define route naming: `/api/[resource]/[id]/[action]`
-   ```
-   GET    /api/patterns              # List patterns
-   GET    /api/patterns/[id]         # Get single pattern
-   POST   /api/patterns              # Create pattern
-   PATCH  /api/patterns/[id]         # Update pattern
-   DELETE /api/patterns/[id]         # Delete pattern
-   POST   /api/patterns/[id]/promote # Action on pattern
-   ```
-3. Define response envelope structure:
-   ```typescript
-   // lib/api/response.ts
-   type ApiResponse<T> = {
-     data: T | null;
-     error: ApiError | null;
-     meta?: {
-       page?: number;
-       pageSize?: number;
-       total?: number;
-     };
-   };
-   ```
-4. Create `lib/api/response.ts` with helper functions:
-   ```typescript
-   export function success<T>(data: T, meta?: object): NextResponse {
-     return NextResponse.json({ data, error: null, meta });
-   }
+### Response Envelope
+```typescript
+type ApiResponse<T> = {
+  data: T | null;
+  error: ApiError | null;
+  meta?: {
+    page?: number;
+    pageSize?: number;
+    total?: number;
+  };
+};
+```
 
-   export function error(code: string, message: string, status: number): NextResponse {
-     return NextResponse.json(
-       { data: null, error: { code, message } },
-       { status }
-     );
-   }
-   ```
-5. Document pagination pattern: `?page=1&pageSize=20`
-6. Document filtering pattern: `?status=candidate&tier=strong`
+### Hono Response Helpers
+```typescript
+// lib/api/response.ts
+import { Context } from 'hono';
 
-### Step 2: Error Handling System
+export function success<T>(c: Context, data: T, meta?: object) {
+  return c.json({ data, error: null, meta });
+}
 
-1. Create `docs/backend/error-handling.md`
-2. Create `lib/errors/base.ts` with error class hierarchy:
-   ```typescript
-   export class AppError extends Error {
-     constructor(
-       public code: string,
-       message: string,
-       public statusCode: number = 500,
-       public details?: unknown
-     ) {
-       super(message);
-       this.name = 'AppError';
-     }
-   }
+export function error(c: Context, code: string, message: string, status: number) {
+  return c.json({ data: null, error: { code, message } }, status);
+}
 
-   export class NotFoundError extends AppError {
-     constructor(resource: string, id: string) {
-       super('NOT_FOUND', `${resource} with id ${id} not found`, 404);
-     }
-   }
+// Usage in route
+app.get('/api/patterns/:id', async (c) => {
+  const id = c.req.param('id');
+  const pattern = await getPattern(id);
+  if (!pattern) {
+    return error(c, 'NOT_FOUND', 'Pattern not found', 404);
+  }
+  return success(c, pattern);
+});
+```
 
-   export class ValidationError extends AppError {
-     constructor(message: string, details?: unknown) {
-       super('VALIDATION_ERROR', message, 400, details);
-     }
-   }
+### Route Naming Convention
+```
+GET    /api/patterns              # List patterns
+GET    /api/patterns/:id          # Get single pattern
+POST   /api/patterns              # Create pattern
+PATCH  /api/patterns/:id          # Update pattern
+DELETE /api/patterns/:id          # Delete pattern
+POST   /api/patterns/:id/promote  # Action on pattern
+```
 
-   export class UnauthorizedError extends AppError {
-     constructor(message = 'Unauthorized') {
-       super('UNAUTHORIZED', message, 401);
-     }
-   }
+---
 
-   export class RateLimitError extends AppError {
-     constructor(retryAfter?: number) {
-       super('RATE_LIMITED', 'Rate limit exceeded', 429, { retryAfter });
-     }
-   }
-   ```
-3. Define error code taxonomy:
-   - `NOT_FOUND` - Resource doesn't exist
-   - `VALIDATION_ERROR` - Invalid input
-   - `UNAUTHORIZED` - Not authenticated
-   - `FORBIDDEN` - Not authorized
-   - `RATE_LIMITED` - Too many requests
-   - `EXTERNAL_API_ERROR` - GitHub/Anthropic failed
-   - `INTERNAL_ERROR` - Unexpected server error
-4. Document what to log vs expose to client:
-   - Log: Full error with stack trace, request context
-   - Expose: Error code, user-friendly message, no internal details
+## Error Handling
 
-### Step 3: Database Access Patterns
+### Error Class Hierarchy
+```typescript
+// lib/errors/base.ts
+export class AppError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public statusCode: number = 500,
+    public details?: unknown
+  ) {
+    super(message);
+    this.name = 'AppError';
+  }
+}
 
-1. Create `docs/backend/database-access.md`
-2. Document Supabase client usage:
-   ```typescript
-   // Simple query
-   const { data, error } = await supabase
-     .from('patterns')
-     .select('*')
-     .eq('repoId', repoId);
+export class NotFoundError extends AppError {
+  constructor(resource: string, id: string) {
+    super('NOT_FOUND', `${resource} with id ${id} not found`, 404);
+  }
+}
 
-   // Complex query with typed helpers
-   import { getPatternsByRepo } from '@/lib/db/patterns';
-   const patterns = await getPatternsByRepo(repoId, { status: 'candidate' });
-   ```
-3. Create typed query helpers in `lib/db/`:
-   ```typescript
-   // lib/db/patterns.ts
-   export async function getPatternsByRepo(
-     repoId: string,
-     filters?: { status?: string; tier?: string }
-   ): Promise<Pattern[]> {
-     let query = supabase.from('patterns').select('*').eq('repoId', repoId);
-     if (filters?.status) query = query.eq('status', filters.status);
-     if (filters?.tier) query = query.eq('tier', filters.tier);
-     const { data, error } = await query;
-     if (error) throw new AppError('DB_ERROR', error.message);
-     return data;
-   }
-   ```
-4. Document transaction patterns (Supabase RPC for atomic operations)
-5. Document RLS policy conventions:
-   - Users can only access repos they own
-   - Patterns/violations scoped by repo ownership
+export class ValidationError extends AppError {
+  constructor(message: string, details?: unknown) {
+    super('VALIDATION_ERROR', message, 400, details);
+  }
+}
 
-### Step 4: Background Job Patterns
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Unauthorized') {
+    super('UNAUTHORIZED', message, 401);
+  }
+}
+```
 
-1. Create `docs/backend/job-patterns.md`
-2. Define job naming conventions:
-   ```
-   jobs/
-   ├── ingest-repo.ts       # Main ingestion job
-   ├── extract-patterns.ts  # Pattern extraction
-   ├── analyze-pr.ts        # PR analysis
-   ├── sync-context-files.ts # Context file sync
-   └── auto-archive.ts      # Scheduled cleanup
-   ```
-3. Document idempotency requirements:
-   ```typescript
-   // Every job must check if work already done
-   export const ingestRepoJob = task({
-     id: 'ingest-repo',
-     run: async (payload: { repoId: string }) => {
-       const repo = await getRepo(payload.repoId);
+### Error Middleware
+```typescript
+// middleware/error-handler.ts
+import { Context, Next } from 'hono';
+import { AppError } from '@/lib/errors/base';
 
-       // Idempotency check
-       if (repo.ingestionStatus === 'ingested') {
-         return { skipped: true, reason: 'Already ingested' };
-       }
+export async function errorHandler(c: Context, next: Next) {
+  try {
+    await next();
+  } catch (err) {
+    if (err instanceof AppError) {
+      return c.json({
+        data: null,
+        error: { code: err.code, message: err.message },
+      }, err.statusCode);
+    }
+    console.error('Unhandled error:', err);
+    return c.json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
+    }, 500);
+  }
+}
+```
 
-       // ... do work
-     },
-   });
-   ```
-4. Configure retry standards:
-   ```typescript
-   export const analyzeprJob = task({
-     id: 'analyze-pr',
-     retry: {
-       maxAttempts: 3,
-       minTimeoutInMs: 1000,
-       maxTimeoutInMs: 30000,
-       factor: 2, // Exponential backoff
-     },
-     run: async (payload) => { /* ... */ },
-   });
-   ```
-5. Document progress reporting via Supabase Realtime:
-   ```typescript
-   await supabase
-     .from('repos')
-     .update({ ingestionStatus: 'ingesting', ingestionProgress: 50 })
-     .eq('id', repoId);
-   ```
+---
 
-### Step 5: Service Layer Patterns
+## Database Access with Drizzle
 
-1. Create `docs/backend/service-layer.md`
-2. Define where business logic lives:
-   ```
-   Route handlers → validate input, call service, format response
-   Services       → business logic, orchestration, cross-cutting concerns
-   DB helpers     → data access, no business logic
-   ```
-3. Create service function patterns:
-   ```typescript
-   // lib/services/patterns.ts
-   export async function promotePattern(
-     patternId: string,
-     userId: string,
-     options: { severity: string; rationale: string }
-   ): Promise<Pattern> {
-     // 1. Validate authorization
-     const pattern = await getPattern(patternId);
-     await assertUserOwnsRepo(userId, pattern.repoId);
+### Getting the Database Client
+```typescript
+import { getDb } from '@/lib/db/client';
 
-     // 2. Execute business logic
-     const updated = await updatePattern(patternId, {
-       status: 'authoritative',
-       severity: options.severity,
-       rationale: options.rationale,
-       promotedBy: userId,
-       promotedAt: new Date(),
-     });
+const db = getDb();
+```
 
-     // 3. Trigger side effects
-     await triggerBacktest(patternId);
-     await triggerContextFileSync(pattern.repoId);
+### Basic Queries
+```typescript
+import { eq, and } from 'drizzle-orm';
+import { patterns } from '@/lib/db/schema';
 
-     return updated;
-   }
-   ```
+// Select all
+const allPatterns = await db.select().from(patterns);
 
-### Step 6: External Integration Patterns
+// Select with filter
+const repoPatterns = await db
+  .select()
+  .from(patterns)
+  .where(eq(patterns.repoId, repoId));
 
-1. Create `docs/backend/integrations.md`
-2. Document rate limit handling:
-   ```typescript
-   // lib/github/rate-limit.ts
-   export async function withRateLimit<T>(
-     fn: () => Promise<T>,
-     options: { maxRetries: number }
-   ): Promise<T> {
-     for (let attempt = 0; attempt < options.maxRetries; attempt++) {
-       try {
-         return await fn();
-       } catch (error) {
-         if (isRateLimitError(error)) {
-           const retryAfter = getRetryAfter(error);
-           await delay(retryAfter * 1000);
-           continue;
-         }
-         throw error;
-       }
-     }
-     throw new RateLimitError();
-   }
-   ```
-3. Create retry-with-backoff utility:
-   ```typescript
-   export async function withRetry<T>(
-     fn: () => Promise<T>,
-     options: { maxAttempts: number; baseDelayMs: number }
-   ): Promise<T> {
-     for (let attempt = 0; attempt < options.maxAttempts; attempt++) {
-       try {
-         return await fn();
-       } catch (error) {
-         if (attempt === options.maxAttempts - 1) throw error;
-         await delay(options.baseDelayMs * Math.pow(2, attempt));
-       }
-     }
-     throw new Error('Unreachable');
-   }
-   ```
+// Select with multiple conditions
+const candidates = await db
+  .select()
+  .from(patterns)
+  .where(and(
+    eq(patterns.repoId, repoId),
+    eq(patterns.status, 'candidate')
+  ));
+```
 
-### Step 7: Logging and Observability
+### Insert Operations
+```typescript
+const [newPattern] = await db
+  .insert(patterns)
+  .values({
+    repoId,
+    name: 'New Pattern',
+    description: 'Description',
+    type: 'code',
+    extractedByModel: 'claude-sonnet-4-5-20250929',
+  })
+  .returning();
+```
 
-1. Document structured logging format:
-   ```typescript
-   // lib/logger.ts
-   export function log(level: 'info' | 'warn' | 'error', message: string, context?: object) {
-     console.log(JSON.stringify({
-       timestamp: new Date().toISOString(),
-       level,
-       message,
-       ...context,
-     }));
-   }
-   ```
-2. Document what to log (and NOT log):
-   - Log: API requests, job progress, errors, external API calls
-   - Do NOT log: User passwords, API keys, PII, full request bodies with secrets
-3. Add correlation IDs via headers for request tracing
+### Update Operations
+```typescript
+const [updated] = await db
+  .update(patterns)
+  .set({
+    status: 'authoritative',
+    validatedAt: new Date(),
+    validatedBy: userId,
+  })
+  .where(eq(patterns.id, patternId))
+  .returning();
+```
 
-## Output Specification
+### Queries with Relations
+```typescript
+// Using Drizzle's relational queries
+const patternWithEvidence = await db.query.patterns.findFirst({
+  where: eq(patterns.id, patternId),
+  with: {
+    evidence: true,
+    repo: true,
+  },
+});
+```
 
-After running this skill, the following should exist:
+### Typed Query Helpers
+```typescript
+// lib/db/queries/patterns.ts
+import { getDb } from '../client';
+import { patterns } from '../schema';
+import { eq, and } from 'drizzle-orm';
 
-### Documentation
-- `docs/backend/api-conventions.md`
-- `docs/backend/error-handling.md`
-- `docs/backend/database-access.md`
-- `docs/backend/job-patterns.md`
-- `docs/backend/service-layer.md`
-- `docs/backend/integrations.md`
+export async function getPatternsByRepo(
+  repoId: string,
+  filters?: { status?: string }
+) {
+  const db = getDb();
+  let conditions = [eq(patterns.repoId, repoId)];
 
-### Shared Infrastructure
-- `lib/api/response.ts`
-- `lib/api/validation.ts`
-- `lib/errors/base.ts`
-- `lib/errors/http.ts`
-- `lib/services/` (base patterns)
-- `lib/logger.ts`
+  if (filters?.status) {
+    conditions.push(eq(patterns.status, filters.status));
+  }
 
-## Consultation Protocol
+  return db.select().from(patterns).where(and(...conditions));
+}
+```
 
-Domain specialists should:
+---
 
-1. **Read** relevant `docs/backend/*.md` before starting server work
-2. **Use** error classes from `lib/errors/`
-3. **Use** API helpers from `lib/api/`
-4. **Follow** job patterns exactly
-5. **Request** new patterns if needed
+## Background Job Patterns
 
-## Key Decisions Made
+### Job Structure (Trigger.dev)
+```typescript
+// jobs/ingest-repo.ts
+import { task } from '@trigger.dev/sdk/v3';
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Response envelope | `{ data, error, meta }` | Consistent structure, easy error handling |
-| Error format | `{ code, message, details }` | Machine-readable code, human message |
-| Validation | Zod schemas | Shared with frontend, TypeScript-first |
-| Database access | Supabase client + typed helpers | Simple queries direct, complex via helpers |
-| Job idempotency | Required for all jobs | Safe retries, no duplicate work |
-| Logging | Structured JSON | Parseable, searchable logs |
+export const ingestRepoJob = task({
+  id: 'ingest-repo',
+  retry: {
+    maxAttempts: 3,
+    minTimeoutInMs: 1000,
+    maxTimeoutInMs: 30000,
+    factor: 2,
+  },
+  run: async (payload: { repoId: string }) => {
+    const db = getDb();
+    const repo = await db.query.repos.findFirst({
+      where: eq(repos.id, payload.repoId),
+    });
 
-## Success Signals
+    // Idempotency check
+    if (repo?.ingestionStatus === 'ingested') {
+      return { skipped: true, reason: 'Already ingested' };
+    }
 
-- Domain specialists can build APIs without design decisions
-- Consistent error responses across all endpoints
-- Predictable job behavior and recovery
-- No duplicate work from retried jobs
+    // Update status
+    await db.update(repos)
+      .set({ ingestionStatus: 'ingesting' })
+      .where(eq(repos.id, payload.repoId));
+
+    // ... do work
+
+    await db.update(repos)
+      .set({ ingestionStatus: 'ingested', lastIngestedAt: new Date() })
+      .where(eq(repos.id, payload.repoId));
+
+    return { success: true };
+  },
+});
+```
+
+### Job Requirements
+- **Idempotency**: Always check if work is already done
+- **Status tracking**: Update database status at each stage
+- **Error handling**: Jobs should surface errors, not swallow them
+- **Retry config**: Use exponential backoff
+
+---
+
+## Service Layer Patterns
+
+### Layer Responsibilities
+```
+Route handlers → validate input, call service, format response
+Services       → business logic, orchestration, cross-cutting concerns
+DB queries     → data access via Drizzle, no business logic
+```
+
+### Service Function Pattern
+```typescript
+// services/patterns.ts
+import { getDb } from '@/lib/db/client';
+import { patterns } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { NotFoundError, UnauthorizedError } from '@/lib/errors/base';
+
+export async function promotePattern(
+  patternId: string,
+  userId: string,
+  options: { severity: string; rationale: string }
+) {
+  const db = getDb();
+
+  // 1. Fetch and validate
+  const pattern = await db.query.patterns.findFirst({
+    where: eq(patterns.id, patternId),
+    with: { repo: true },
+  });
+
+  if (!pattern) {
+    throw new NotFoundError('Pattern', patternId);
+  }
+
+  if (pattern.repo.userId !== userId) {
+    throw new UnauthorizedError('Not authorized to modify this pattern');
+  }
+
+  // 2. Execute business logic
+  const [updated] = await db.update(patterns)
+    .set({
+      status: 'authoritative',
+      defaultSeverity: options.severity,
+      rationale: options.rationale,
+      validatedBy: userId,
+      validatedAt: new Date(),
+    })
+    .where(eq(patterns.id, patternId))
+    .returning();
+
+  // 3. Trigger side effects (background jobs)
+  await ingestRepoJob.trigger({ repoId: pattern.repoId });
+
+  return updated;
+}
+```
+
+---
+
+## Supabase Client (Auth/Realtime Only)
+
+The Supabase client is for auth, storage, and realtime features only. **Do not use it for database queries** - use Drizzle ORM instead.
+
+```typescript
+import { getSupabaseClient } from '@/lib/supabase/client';
+
+// Auth operations
+const supabase = getSupabaseClient();
+const { data: { user } } = await supabase.auth.getUser(token);
+
+// Storage operations
+await supabase.storage.from('diffs').upload(path, content);
+
+// Realtime subscriptions (client-side)
+supabase.channel('repos').on('postgres_changes', callback);
+```
+
+---
+
+## Validation with Zod
+
+### Route Validation
+```typescript
+import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
+
+const createPatternSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().min(1),
+  type: z.enum(['code', 'filesystem']),
+});
+
+app.post(
+  '/api/patterns',
+  zValidator('json', createPatternSchema),
+  async (c) => {
+    const data = c.req.valid('json');
+    // data is typed as { name: string; description: string; type: 'code' | 'filesystem' }
+  }
+);
+```
+
+---
+
+## Validation Commands
+
+```bash
+bun run typecheck    # TypeScript check
+bun run build        # Build API
+bun run test         # Run tests
+bun run dev          # Development server (port 3001)
+```
+
+---
 
 ## Handoffs
 

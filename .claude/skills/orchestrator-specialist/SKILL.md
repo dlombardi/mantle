@@ -124,10 +124,10 @@ BEADS: #42
 | Skill | Expertise | Key Files |
 |-------|-----------|-----------|
 | `hono-specialist` | Hono routes, middleware, validation | `apps/api/src/routes/` |
-| `frontend-architect` | React components, state, data fetching | `apps/web/src/` |
-| `testing-consultant` | Vitest, mocks, fixtures, coverage | `**/*.test.ts` |
-| `backend-architect` | Services, error handling, jobs | `apps/api/src/services/` |
-| `foundation-specialist` | Config, Drizzle, tooling, infra | `*.config.*`, `drizzle/` |
+| `frontend-architect` | React components, state, routing | `apps/web/src/` |
+| `testing-consultant` | Vitest, Playwright, mocks, coverage | `**/*.test.ts`, `e2e/` |
+| `backend-architect` | Services, Drizzle ORM, jobs | `apps/api/src/lib/db/`, `apps/api/src/services/` |
+| `foundation-specialist` | Config, migrations, tooling | `*.config.*`, `supabase/migrations/` |
 
 ---
 
