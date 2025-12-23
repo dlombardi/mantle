@@ -1,25 +1,27 @@
 # Testing Consultant
 
-Establishes testing strategy, patterns, and conventions. Defines what to test, how to test it, and provides testing infrastructure.
+Testing strategy and patterns for Vitest, React Testing Library, and Playwright.
 
 ---
 
 ## Activation
 
 Invoke this skill when working on:
-- Test infrastructure setup (Vitest config, setup files)
+- Test infrastructure setup (Vitest, Playwright config)
 - Writing unit tests for business logic
-- Writing integration tests for APIs
 - Writing component tests for UI
+- Writing API route tests
+- Writing E2E tests with Playwright
 - Creating mocks for external services
 - Improving test coverage or fixing flaky tests
 
-**Trigger keywords:** `test`, `spec`, `mock`, `fixture`, `vitest`, `expect`, `coverage`
+**Trigger keywords:** `test`, `spec`, `mock`, `fixture`, `vitest`, `expect`, `coverage`, `playwright`, `e2e`
 
 **Key files:**
 - `**/*.test.ts`, `**/*.spec.ts`
 - `apps/*/vitest.config.ts`
-- `apps/*/tests/`
+- `apps/*/playwright.config.ts`
+- `e2e/`
 
 ---
 
@@ -28,7 +30,7 @@ Invoke this skill when working on:
 Track testing work with beads:
 ```bash
 # Adding tests for a feature
-bd create "Add tests for user preferences API"
+bd create "Add tests for user settings API"
 bd update <id> -s in-progress
 
 # Complete when passing
@@ -37,407 +39,395 @@ bun run test && bd complete <id>
 
 ---
 
-## Prerequisites
+## Tech Stack
 
-- Project initialized (via foundation-specialist)
-- Backend and frontend patterns established
-- Node.js and npm configured
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| Unit/Integration | Vitest | Fast, ESM-native, Vite integration |
+| Components | React Testing Library | User-centric, accessibility-focused |
+| E2E | Playwright | Cross-browser, visual testing |
+| Runner | Bun | Fast test execution |
 
-## Workflow
+---
 
-### Step 1: Test Infrastructure Setup
+## Test Organization
 
-1. Install and configure Vitest:
-   ```bash
-   npm install -D vitest @vitest/coverage-v8 @vitest/ui
-   ```
-2. Create `vitest.config.ts`:
-   ```typescript
-   import { defineConfig } from 'vitest/config';
-   import react from '@vitejs/plugin-react';
-   import path from 'path';
+### File Structure
+```
+apps/
+├── api/
+│   └── src/
+│       ├── routes/
+│       │   ├── health.ts
+│       │   └── health.test.ts      # Co-located
+│       └── services/
+│           ├── user.ts
+│           └── user.test.ts        # Co-located
+└── web/
+    └── src/
+        ├── components/
+        │   ├── Button.tsx
+        │   └── Button.test.tsx     # Co-located
+        └── hooks/
+            ├── use-auth.ts
+            └── use-auth.test.ts    # Co-located
+e2e/
+├── auth.spec.ts                    # E2E tests separate
+├── settings.spec.ts
+└── fixtures/
+    └── test-user.ts
+```
 
-   export default defineConfig({
-     plugins: [react()],
-     test: {
-       globals: true,
-       environment: 'jsdom',
-       setupFiles: ['./tests/setup.ts'],
-       coverage: {
-         provider: 'v8',
-         reporter: ['text', 'html'],
-         exclude: ['node_modules/', 'tests/'],
-       },
-     },
-     resolve: {
-       alias: {
-         '@': path.resolve(__dirname, './'),
-       },
-     },
-   });
-   ```
-3. Create `tests/setup.ts` with global config:
-   ```typescript
-   import '@testing-library/jest-dom/vitest';
-   import { cleanup } from '@testing-library/react';
-   import { afterEach, vi } from 'vitest';
+### Test Pyramid
+```
+┌─────────────────────┐
+│     E2E Tests       │  ← Few, slow, high confidence
+│   (Playwright)      │     Critical user flows only
+├─────────────────────┤
+│ Integration Tests   │  ← More, test boundaries
+│  (API routes, DB)   │     Request/response contracts
+├─────────────────────┤
+│    Unit Tests       │  ← Many, fast, isolated
+│ (Functions, Hooks)  │     Business logic
+└─────────────────────┘
+```
 
-   // Cleanup after each test
-   afterEach(() => {
-     cleanup();
-   });
+---
 
-   // Mock environment variables
-   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'http://localhost:54321');
-   vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'test-anon-key');
-   ```
-4. Add test scripts to `package.json`:
-   ```json
-   {
-     "scripts": {
-       "test": "vitest",
-       "test:watch": "vitest --watch",
-       "test:coverage": "vitest --coverage",
-       "test:ui": "vitest --ui"
-     }
-   }
-   ```
+## Unit Test Patterns
 
-### Step 2: Define Test Strategy
+### Naming Convention
+```typescript
+describe('functionName', () => {
+  it('should [expected behavior] when [condition]', () => {
+    // ...
+  });
+});
+```
 
-1. Create `docs/testing/strategy.md`
-2. Document the testing pyramid:
-   ```
-   ┌───────────────────┐
-   │    E2E Tests      │  ← Few, slow, high confidence
-   │  (Playwright)     │
-   ├───────────────────┤
-   │ Integration Tests │  ← More, test boundaries
-   │ (API, DB, Jobs)   │
-   ├───────────────────┤
-   │   Unit Tests      │  ← Many, fast, isolated
-   │ (Functions, Hooks)│
-   └───────────────────┘
-   ```
-3. Document what to test:
-   - Business logic (confidence scoring, tier derivation, violation detection)
-   - Edge cases and error handling
-   - API contracts (request/response shapes)
-   - User interactions (keyboard navigation, form submission)
-4. Document what NOT to test:
-   - Implementation details (internal state, private methods)
-   - Third-party code (Supabase client, Octokit)
-   - Trivial code (simple getters, pass-through functions)
-   - Prompt strings (test the parsing, not the prompt)
-5. Coverage targets:
-   - Business logic: 80%
-   - UI components: 60% (focus on interactions, not styling)
-   - API routes: 70%
-   - Jobs: 70%
+### Arrange-Act-Assert
+```typescript
+import { describe, it, expect } from 'vitest';
+import { formatCurrency } from './format';
 
-### Step 3: Create Mock Infrastructure
+describe('formatCurrency', () => {
+  it('should format positive amounts with dollar sign', () => {
+    // Arrange
+    const amount = 1234.56;
 
-1. Create `tests/mocks/supabase.ts`:
-   ```typescript
-   import { vi } from 'vitest';
+    // Act
+    const result = formatCurrency(amount);
 
-   export const mockSupabaseClient = {
-     from: vi.fn(() => ({
-       select: vi.fn().mockReturnThis(),
-       insert: vi.fn().mockReturnThis(),
-       update: vi.fn().mockReturnThis(),
-       delete: vi.fn().mockReturnThis(),
-       eq: vi.fn().mockReturnThis(),
-       single: vi.fn(),
-     })),
-     auth: {
-       getUser: vi.fn(),
-       signInWithOAuth: vi.fn(),
-     },
-     channel: vi.fn(() => ({
-       on: vi.fn().mockReturnThis(),
-       subscribe: vi.fn(),
-     })),
-   };
+    // Assert
+    expect(result).toBe('$1,234.56');
+  });
 
-   export function mockSupabaseResponse<T>(data: T) {
-     return { data, error: null };
-   }
+  it('should handle zero', () => {
+    expect(formatCurrency(0)).toBe('$0.00');
+  });
 
-   export function mockSupabaseError(message: string) {
-     return { data: null, error: { message } };
-   }
-   ```
+  it('should throw for negative amounts', () => {
+    expect(() => formatCurrency(-100)).toThrow('Amount must be positive');
+  });
+});
+```
 
-2. Create `tests/mocks/github.ts`:
-   ```typescript
-   import { vi } from 'vitest';
+---
 
-   export const mockOctokit = {
-     rest: {
-       repos: {
-         getContent: vi.fn(),
-         listForAuthenticatedUser: vi.fn(),
-       },
-       pulls: {
-         list: vi.fn(),
-         get: vi.fn(),
-         createReview: vi.fn(),
-       },
-       checks: {
-         create: vi.fn(),
-       },
-     },
-   };
+## Component Test Patterns
 
-   export function mockGitHubContent(files: Array<{ path: string; content: string }>) {
-     return files.map((f) => ({
-       type: 'file',
-       path: f.path,
-       content: Buffer.from(f.content).toString('base64'),
-       encoding: 'base64',
-     }));
-   }
-   ```
+### React Testing Library
+```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { Button } from './Button';
 
-3. Create `tests/mocks/anthropic.ts`:
-   ```typescript
-   import { vi } from 'vitest';
+describe('Button', () => {
+  it('should render with text', () => {
+    render(<Button>Click me</Button>);
+    expect(screen.getByRole('button', { name: 'Click me' })).toBeInTheDocument();
+  });
 
-   export const mockAnthropicClient = {
-     messages: {
-       create: vi.fn(),
-     },
-   };
+  it('should call onClick when clicked', () => {
+    const handleClick = vi.fn();
+    render(<Button onClick={handleClick}>Click</Button>);
 
-   export function mockExtractionResponse(patterns: unknown[]) {
-     return {
-       content: [
-         {
-           type: 'text',
-           text: JSON.stringify({ patterns }),
-         },
-       ],
-     };
-   }
-   ```
+    fireEvent.click(screen.getByRole('button'));
 
-4. Create `tests/mocks/trigger.ts`:
-   ```typescript
-   import { vi } from 'vitest';
+    expect(handleClick).toHaveBeenCalledOnce();
+  });
 
-   export const mockTrigger = {
-     task: vi.fn((config) => ({
-       id: config.id,
-       trigger: vi.fn(),
-     })),
-   };
-   ```
+  it('should be disabled when loading', () => {
+    render(<Button loading>Submit</Button>);
+    expect(screen.getByRole('button')).toBeDisabled();
+  });
+});
+```
 
-### Step 4: Create Test Data Factories
+### Query Priority (user-centric)
+1. `getByRole` - Most accessible
+2. `getByLabelText` - Form fields
+3. `getByPlaceholderText` - Inputs
+4. `getByText` - Non-interactive content
+5. `getByTestId` - Last resort
 
-1. Create `tests/fixtures/users.ts`:
-   ```typescript
-   import { faker } from '@faker-js/faker';
+---
 
-   export function createUser(overrides = {}) {
-     return {
-       id: faker.string.uuid(),
-       email: faker.internet.email(),
-       name: faker.person.fullName(),
-       avatarUrl: faker.image.avatar(),
-       createdAt: faker.date.past().toISOString(),
-       ...overrides,
-     };
-   }
-   ```
+## API Test Patterns
 
-2. Create `tests/fixtures/repos.ts`:
-   ```typescript
-   import { faker } from '@faker-js/faker';
+### Hono Route Testing
+```typescript
+import { describe, it, expect, beforeAll } from 'vitest';
+import { testClient } from 'hono/testing';
+import { app } from '../index';
 
-   export function createRepo(overrides = {}) {
-     return {
-       id: faker.string.uuid(),
-       name: faker.lorem.slug(),
-       fullName: `${faker.internet.userName()}/${faker.lorem.slug()}`,
-       installationId: faker.number.int({ min: 1000000, max: 9999999 }),
-       ingestionStatus: 'pending',
-       tokenCount: 0,
-       createdAt: faker.date.past().toISOString(),
-       ...overrides,
-     };
-   }
-   ```
+describe('GET /api/health', () => {
+  const client = testClient(app);
 
-3. Create `tests/fixtures/patterns.ts`:
-   ```typescript
-   import { faker } from '@faker-js/faker';
+  it('should return 200 with status', async () => {
+    const res = await client.api.health.$get();
 
-   export function createPattern(overrides = {}) {
-     return {
-       id: faker.string.uuid(),
-       repoId: faker.string.uuid(),
-       name: faker.lorem.words(3),
-       description: faker.lorem.paragraph(),
-       type: faker.helpers.arrayElement(['code', 'file-naming', 'file-structure']),
-       status: 'candidate',
-       tier: faker.helpers.arrayElement(['strong', 'moderate', 'weak', 'emerging', 'legacy']),
-       confidence: {
-         evidence: { instanceCount: faker.number.int({ min: 1, max: 20 }), consistency: faker.number.float({ min: 0.5, max: 1 }) },
-         adoption: { uniqueAuthors: faker.number.int({ min: 1, max: 10 }) },
-         establishment: { ageCategory: faker.helpers.arrayElement(['new', 'recent', 'established', 'legacy']) },
-         location: { codeCategory: faker.helpers.arrayElement(['core', 'feature', 'utility', 'test']) },
-       },
-       createdAt: faker.date.past().toISOString(),
-       ...overrides,
-     };
-   }
-   ```
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data).toHaveProperty('status', 'ok');
+  });
+});
 
-### Step 5: Document Unit Test Patterns
+describe('POST /api/users', () => {
+  it('should create user with valid data', async () => {
+    const res = await client.api.users.$post({
+      json: { email: 'test@example.com', name: 'Test User' },
+    });
 
-1. Create `docs/testing/unit-tests.md`
-2. Document test file organization:
-   ```
-   lib/
-   ├── extraction/
-   │   ├── confidence.ts
-   │   └── confidence.test.ts  # Co-located
-   ```
-3. Document test naming: `describe('functionName', () => { it('should behavior when condition', ...) })`
-4. Document Arrange-Act-Assert structure:
-   ```typescript
-   describe('derivePatternTier', () => {
-     it('should return strong when all thresholds met', () => {
-       // Arrange
-       const confidence = {
-         evidence: { instanceCount: 5, consistency: 1.0 },
-         adoption: { uniqueAuthors: 3 },
-         establishment: { ageCategory: 'established' },
-         location: { codeCategory: 'core' },
-       };
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.data).toHaveProperty('id');
+  });
 
-       // Act
-       const tier = derivePatternTier(confidence);
+  it('should return 400 for invalid email', async () => {
+    const res = await client.api.users.$post({
+      json: { email: 'invalid', name: 'Test' },
+    });
 
-       // Assert
-       expect(tier).toBe('strong');
-     });
-   });
-   ```
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+```
 
-### Step 6: Document Integration Test Patterns
+---
 
-1. Create `docs/testing/integration-tests.md`
-2. Document API route testing:
-   ```typescript
-   import { createRequest } from 'tests/utils/request';
+## E2E Test Patterns (Playwright)
 
-   describe('POST /api/patterns/[id]/promote', () => {
-     it('should promote pattern and trigger backtest', async () => {
-       // Setup
-       const pattern = await createTestPattern({ status: 'candidate' });
+### Basic Test Structure
+```typescript
+import { test, expect } from '@playwright/test';
 
-       // Execute
-       const response = await createRequest('/api/patterns/' + pattern.id + '/promote', {
-         method: 'POST',
-         body: { severity: 'error', rationale: 'Critical pattern' },
-       });
+test.describe('Authentication', () => {
+  test('user can sign in with email', async ({ page }) => {
+    await page.goto('/login');
 
-       // Verify
-       expect(response.status).toBe(200);
-       expect(response.data.status).toBe('authoritative');
-     });
-   });
-   ```
-3. Document database test isolation:
-   - Use test schema or transaction rollback
-   - Clean up after each test
-   - Don't share state between tests
+    await page.getByLabel('Email').fill('test@example.com');
+    await page.getByLabel('Password').fill('password123');
+    await page.getByRole('button', { name: 'Sign In' }).click();
 
-### Step 7: Document Component Test Patterns
+    await expect(page).toHaveURL('/dashboard');
+    await expect(page.getByText('Welcome back')).toBeVisible();
+  });
+});
+```
 
-1. Create `docs/testing/component-tests.md`
-2. Document React Testing Library usage:
-   ```typescript
-   import { render, screen, fireEvent } from '@testing-library/react';
-   import { TriageQueue } from '@/components/patterns/triage-queue';
-   import { createPattern } from 'tests/fixtures/patterns';
+### Page Object Model
+```typescript
+// e2e/pages/LoginPage.ts
+import { Page, Locator } from '@playwright/test';
 
-   describe('TriageQueue', () => {
-     it('should navigate with j/k keys', async () => {
-       const patterns = [createPattern(), createPattern()];
-       render(<TriageQueue patterns={patterns} />);
+export class LoginPage {
+  readonly page: Page;
+  readonly emailInput: Locator;
+  readonly passwordInput: Locator;
+  readonly submitButton: Locator;
 
-       // First pattern selected by default
-       expect(screen.getByRole('listitem', { current: true })).toHaveTextContent(patterns[0].name);
+  constructor(page: Page) {
+    this.page = page;
+    this.emailInput = page.getByLabel('Email');
+    this.passwordInput = page.getByLabel('Password');
+    this.submitButton = page.getByRole('button', { name: 'Sign In' });
+  }
 
-       // Press 'j' to move down
-       fireEvent.keyDown(document, { key: 'j' });
+  async goto() {
+    await this.page.goto('/login');
+  }
 
-       expect(screen.getByRole('listitem', { current: true })).toHaveTextContent(patterns[1].name);
-     });
-   });
-   ```
-3. Prefer user-centric queries: `getByRole`, `getByText`, `getByLabelText`
-4. Avoid snapshot tests for every component (only for complex rendering)
+  async login(email: string, password: string) {
+    await this.emailInput.fill(email);
+    await this.passwordInput.fill(password);
+    await this.submitButton.click();
+  }
+}
 
-## Output Specification
+// e2e/auth.spec.ts
+import { test, expect } from '@playwright/test';
+import { LoginPage } from './pages/LoginPage';
 
-After running this skill, the following should exist:
+test('user can sign in', async ({ page }) => {
+  const loginPage = new LoginPage(page);
+  await loginPage.goto();
+  await loginPage.login('test@example.com', 'password123');
 
-### Configuration
-- `vitest.config.ts`
-- `tests/setup.ts`
-- Updated `package.json` with test scripts
+  await expect(page).toHaveURL('/dashboard');
+});
+```
 
-### Documentation
-- `docs/testing/strategy.md`
-- `docs/testing/unit-tests.md`
-- `docs/testing/integration-tests.md`
-- `docs/testing/component-tests.md`
-- `docs/testing/mocking-patterns.md`
+### Playwright Config
+```typescript
+// playwright.config.ts
+import { defineConfig, devices } from '@playwright/test';
 
-### Test Infrastructure
-- `tests/mocks/supabase.ts`
-- `tests/mocks/github.ts`
-- `tests/mocks/anthropic.ts`
-- `tests/mocks/trigger.ts`
-- `tests/fixtures/users.ts`
-- `tests/fixtures/repos.ts`
-- `tests/fixtures/patterns.ts`
-- `tests/fixtures/violations.ts`
-- `tests/utils/request.ts`
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  ],
+  webServer: {
+    command: 'bun run dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+  },
+});
+```
 
-## Consultation Protocol
+---
 
-Domain specialists should:
+## Mocking Patterns
 
-1. **Read** `docs/testing/strategy.md` before writing any tests
-2. **Read** pattern-specific docs for their test type
-3. **Use** mocks from `tests/mocks/`
-4. **Use** factories from `tests/fixtures/`
-5. **Request** new patterns if needed
+### Supabase Client Mock
+```typescript
+import { vi } from 'vitest';
 
-## Key Decisions Made
+export function createMockSupabase() {
+  return {
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn(),
+    })),
+    auth: {
+      getUser: vi.fn(),
+      signInWithOAuth: vi.fn(),
+      signOut: vi.fn(),
+    },
+  };
+}
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Test runner | Vitest | Fast, ESM-native, good DX, Vite integration |
-| Component testing | React Testing Library | User-centric, accessibility-focused |
-| API testing | Built-in fetch | No extra dependencies |
-| Coverage target | 80% business logic | Pragmatic, not 100% |
-| Database tests | Test schema + cleanup | Isolated, repeatable |
-| Mock boundary | External APIs only | Don't mock internal modules |
+// Usage in test
+import { createMockSupabase } from './mocks/supabase';
 
-## Success Signals
+vi.mock('@/lib/supabase', () => ({
+  getSupabaseClient: () => createMockSupabase(),
+}));
+```
 
-- Domain specialists know what to test without asking
-- Tests are consistent in style and approach
-- Test suite runs fast (< 30 seconds for unit tests)
-- No flaky tests
-- CI pipeline catches regressions
+### Environment Variables
+```typescript
+// vitest.config.ts or test setup
+import { vi } from 'vitest';
+
+vi.stubEnv('VITE_SUPABASE_URL', 'http://localhost:54321');
+vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test-anon-key');
+vi.stubEnv('VITE_API_URL', 'http://localhost:3001');
+```
+
+### Fetch Mock
+```typescript
+import { vi, beforeEach, afterEach } from 'vitest';
+
+beforeEach(() => {
+  vi.spyOn(global, 'fetch').mockResolvedValue(
+    new Response(JSON.stringify({ data: 'mocked' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  );
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+```
+
+---
+
+## Test Data Factories
+
+### Generic Factory Pattern
+```typescript
+// tests/factories/user.ts
+import { faker } from '@faker-js/faker';
+
+export function createUser(overrides = {}) {
+  return {
+    id: faker.string.uuid(),
+    email: faker.internet.email(),
+    name: faker.person.fullName(),
+    createdAt: faker.date.past().toISOString(),
+    ...overrides,
+  };
+}
+
+// Usage
+const user = createUser({ name: 'Test User' });
+```
+
+---
+
+## Validation Commands
+
+```bash
+# Unit/Integration tests
+bun run test              # Run all tests
+bun run test --watch      # Watch mode
+bun run test --coverage   # Coverage report
+
+# E2E tests
+bun run test:e2e          # Run Playwright tests
+bun run test:e2e --ui     # Playwright UI mode
+bun run test:e2e --debug  # Debug mode
+```
+
+---
+
+## What to Test
+
+### DO Test
+- Business logic and calculations
+- Edge cases and error handling
+- API request/response contracts
+- User interactions (clicks, form submissions)
+- Critical user flows (E2E)
+
+### DON'T Test
+- Implementation details (internal state)
+- Third-party library internals
+- Trivial code (simple getters)
+- Styling (unless critical)
+
+---
 
 ## Handoffs
 
@@ -448,4 +438,4 @@ Domain specialists should:
 | `frontend-architect` | After implementing components |
 | `hono-specialist` | After implementing routes |
 
-Tests are typically the final step in a feature workflow - other skills hand off to testing-consultant for coverage.
+Tests are typically the final step in a feature workflow.
