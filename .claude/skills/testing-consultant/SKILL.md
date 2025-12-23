@@ -1,34 +1,41 @@
----
-name: testing-consultant
-description: |
-  Establishes testing strategy, patterns, and conventions for Reasoning Substrate. Consult this
-  skill BEFORE writing tests for any new feature or module. Defines what to test, how to test it,
-  and testing infrastructure. Produces documentation in docs/testing/ and shared test utilities
-  in tests/. Invoke when: setting up test infrastructure, deciding test coverage approach,
-  implementing mocks for external services, writing integration tests, or when any domain
-  specialist needs guidance on testing their code.
-license: MIT
-compatibility: Vitest, React Testing Library, TypeScript
-allowed-tools: Read Write Bash(npm:*) Bash(vitest:*) Glob Grep
-metadata:
-  role: consultant
-  consulted-by: all-domain-specialists
-  priority: phase-1
----
-
 # Testing Consultant
 
-## Purpose
+Establishes testing strategy, patterns, and conventions. Defines what to test, how to test it, and provides testing infrastructure.
 
-Establish testing strategy and patterns that all specialists follow when writing tests. This skill produces documentation, test infrastructure, and shared utilities rather than owning specific feature tasks.
+---
 
-## When to Activate This Skill
+## Activation
 
-- Beginning of project (Phase 1) to establish testing infrastructure
-- Before any domain specialist writes tests
-- When new testing patterns are needed
-- When tests are slow, flaky, or inadequate
-- When setting up mocks for external services
+Invoke this skill when working on:
+- Test infrastructure setup (Vitest config, setup files)
+- Writing unit tests for business logic
+- Writing integration tests for APIs
+- Writing component tests for UI
+- Creating mocks for external services
+- Improving test coverage or fixing flaky tests
+
+**Trigger keywords:** `test`, `spec`, `mock`, `fixture`, `vitest`, `expect`, `coverage`
+
+**Key files:**
+- `**/*.test.ts`, `**/*.spec.ts`
+- `apps/*/vitest.config.ts`
+- `apps/*/tests/`
+
+---
+
+## Beads Integration
+
+Track testing work with beads:
+```bash
+# Adding tests for a feature
+bd create "Add tests for user preferences API"
+bd update <id> -s in-progress
+
+# Complete when passing
+bun run test && bd complete <id>
+```
+
+---
 
 ## Prerequisites
 
@@ -403,35 +410,6 @@ After running this skill, the following should exist:
 - `tests/fixtures/violations.ts`
 - `tests/utils/request.ts`
 
-## Testing Requirements by Domain
-
-### extraction-specialist
-- Unit test: confidence scoring (pure functions)
-- Unit test: tier derivation logic
-- Integration test: LLM response parsing (with mock responses)
-- Skip: prompt string testing
-
-### enforcement-specialist
-- Unit test: violation detection logic
-- Integration test: webhook signature verification
-- Integration test: PR comment formatting
-- Mock: GitHub API at Octokit level
-
-### validation-ui-specialist
-- Component test: keyboard navigation (j/k/p/r/d)
-- Component test: action modal flows
-- Skip: snapshot tests for every component
-
-### ingestion-specialist
-- Unit test: token counting
-- Integration test: file tree building
-- Mock: GitHub API responses
-
-### github-integration-specialist
-- Integration test: OAuth flow (with mock provider)
-- Unit test: token refresh logic
-- Integration test: webhook signature verification
-
 ## Consultation Protocol
 
 Domain specialists should:
@@ -463,5 +441,11 @@ Domain specialists should:
 
 ## Handoffs
 
-- **Infrastructure ready** → Specialists can write tests alongside features
-- **Patterns need update** → Return to this skill for new testing needs
+| Upstream | When |
+|----------|------|
+| `orchestrator-specialist` | Routes testing tasks here |
+| `backend-architect` | After implementing services/APIs |
+| `frontend-architect` | After implementing components |
+| `hono-specialist` | After implementing routes |
+
+Tests are typically the final step in a feature workflow - other skills hand off to testing-consultant for coverage.

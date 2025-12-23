@@ -1,11 +1,40 @@
----
-name: hono
-description: This skill should be used when developing with the Hono web framework, including CLI tool usage, project scaffolding, routing, middleware configuration, testing, optimization, and deployment across multiple JavaScript runtimes (Cloudflare Workers, Deno, Bun, Vercel, AWS Lambda, Node.js)
+# Hono Specialist
+
+Provides guidance for developing web applications and APIs with the Hono framework on Bun runtime.
+
 ---
 
-# Hono Web Framework Skill
+## Activation
 
-Provide comprehensive guidance for developing web applications and APIs with the Hono framework.
+Invoke this skill when working on:
+- API route handlers and routing
+- Middleware configuration
+- Request/response handling
+- Validation with Zod
+- Hono-specific patterns and utilities
+
+**Trigger keywords:** `route`, `middleware`, `handler`, `app.`, `c.json`, `c.req`, `Hono`
+
+**Key files:**
+- `apps/api/src/routes/`
+- `apps/api/src/middleware/`
+- `apps/api/src/index.ts`
+
+---
+
+## Beads Integration
+
+Track Hono work with beads:
+```bash
+# Adding a new route
+bd create "Add PATCH /api/preferences/:id route"
+bd update <id> -s in-progress
+
+# Complete when working
+bun run typecheck && bd complete <id>
+```
+
+---
 
 ## Overview
 
@@ -247,6 +276,21 @@ Activate this skill when the user:
 - Use `create-hono` CLI for new projects rather than manual setup
 - Verify package.json scripts match the runtime environment
 - Follow the workflow: Identify → Search → Load docs → Implement → Test → Optimize
+
+## Handoffs
+
+| Downstream | When |
+|------------|------|
+| `backend-architect` | For service layer patterns |
+| `testing-consultant` | For route tests |
+| `foundation-specialist` | For database schema changes |
+
+| Upstream | When |
+|----------|------|
+| `orchestrator-specialist` | Routes API tasks here |
+| `frontend-architect` | Needs API endpoints for UI |
+
+---
 
 ## Resources
 

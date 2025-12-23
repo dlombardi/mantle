@@ -1,34 +1,46 @@
----
-name: backend-architect
-description: |
-  Establishes backend architecture patterns for Reasoning Substrate: API design, error handling,
-  database access, background jobs, and service layer conventions. Consult this skill BEFORE
-  building any API routes, Trigger.dev jobs, or database queries. Produces pattern documentation
-  in docs/backend/ and shared infrastructure in lib/api/, lib/errors/, lib/services/. Invoke when:
-  designing API endpoints, implementing error handling, structuring background jobs, or when any
-  domain specialist needs guidance on server-side patterns.
-license: MIT
-compatibility: Next.js 14+ API Routes, Supabase, Trigger.dev, TypeScript
-allowed-tools: Read Write Bash(npm:*) Glob Grep
-metadata:
-  role: consultant
-  consulted-by: all-domain-specialists
-  priority: phase-1
----
-
 # Backend Architect
 
-## Purpose
+Establishes backend architecture patterns: API design, error handling, database access, background jobs, and service layer conventions.
 
-Establish backend patterns and conventions that all server-side specialists follow. This skill produces documentation and shared infrastructure rather than owning specific feature tasks.
+---
 
-## When to Activate This Skill
+## Activation
 
-- Beginning of project (Phase 1) to establish patterns before API/job work begins
-- Before any domain specialist builds API routes or jobs
-- When new backend patterns are needed
-- When making architectural decisions about APIs/jobs/database
-- When integrating with external APIs (GitHub, Anthropic)
+Invoke this skill when working on:
+- API endpoint design and implementation
+- Error handling patterns and error classes
+- Service layer architecture
+- Background job patterns (Trigger.dev)
+- Database query patterns and helpers
+- External API integration (GitHub, Anthropic)
+
+**Trigger keywords:** `service`, `job`, `trigger`, `error`, `repository`, `API design`
+
+**Key files:**
+- `apps/api/src/services/`
+- `apps/api/src/jobs/`
+- `apps/api/src/lib/errors/`
+- `apps/api/src/lib/api/`
+
+---
+
+## Beads Integration
+
+Track backend work with beads:
+```bash
+# Starting a new service
+bd create "Implement user preferences service"
+bd update <id> -s in-progress
+
+# Track job implementation
+bd create "Add background job for email notifications"
+bd dep add <job-id> <service-id>  # Job depends on service
+
+# Complete when tested
+bun run test && bd complete <id>
+```
+
+---
 
 ## Prerequisites
 
@@ -367,5 +379,13 @@ Domain specialists should:
 
 ## Handoffs
 
-- **Patterns established** → All domain specialists can build server-side features
-- **Patterns need update** → Return to this skill to document new patterns
+| Downstream | When |
+|------------|------|
+| `hono-specialist` | For route implementation details |
+| `testing-consultant` | For service/job tests |
+| `foundation-specialist` | For database schema changes |
+
+| Upstream | When |
+|----------|------|
+| `orchestrator-specialist` | Routes complex backend tasks here |
+| `hono-specialist` | Needs service layer patterns |
