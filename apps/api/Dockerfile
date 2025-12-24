@@ -1,33 +1,30 @@
 # Dockerfile for @mantle/api
-# Uses Turborepo prune for optimized monorepo builds
+# Copies all workspace package.json files for lockfile compatibility
 
 FROM oven/bun:1.3.0-alpine AS base
 RUN apk add --no-cache libc6-compat
-RUN bun add -g turbo
 
-# Prune stage - create minimal subset for @mantle/api
-FROM base AS pruner
-WORKDIR /app
-COPY . .
-RUN turbo prune @mantle/api --docker
-
-# Install stage - install pruned dependencies
+# Install stage
 FROM base AS installer
 WORKDIR /app
 
-# Copy pruned package.json files and ORIGINAL lockfile (not pruned)
-COPY --from=pruner /app/out/json/ .
-COPY --from=pruner /app/bun.lock ./bun.lock
+# Copy ALL package.json files and lockfile (for exact lockfile match)
+COPY package.json bun.lock turbo.json ./
+COPY apps/api/package.json ./apps/api/
+COPY apps/web/package.json ./apps/web/
+COPY packages/db/package.json ./packages/db/
+COPY packages/trpc/package.json ./packages/trpc/
+COPY packages/test-utils/package.json ./packages/test-utils/
 
-# Install dependencies
+# Install all dependencies
 RUN bun install --frozen-lockfile
 
-# Copy pruned source code and build
-COPY --from=pruner /app/out/full/ .
+# Copy source and build
+COPY . .
 RUN bun run build --filter=@mantle/api
 
 # Production stage - minimal runtime image
-FROM oven/bun:1.3.0-alpine AS runner
+FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
