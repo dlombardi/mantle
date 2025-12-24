@@ -3,6 +3,8 @@
  *
  * This file runs the Hono app as a Bun server.
  * Used for both local development and Railway deployment.
+ *
+ * Preview environment verified: 2025-12-24
  */
 
 import { closeDb } from './lib/db';
