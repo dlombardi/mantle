@@ -15,7 +15,7 @@ COPY packages/trpc/package.json ./packages/trpc/
 COPY packages/test-utils/package.json ./packages/test-utils/
 
 # Install all dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Build stage
 FROM base AS builder
