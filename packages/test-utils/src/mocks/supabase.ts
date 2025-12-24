@@ -38,7 +38,7 @@ export function createMockSupabaseClient(options: MockSupabaseOptions = {}) {
         error: null,
       }),
       signOut: vi.fn().mockResolvedValue({ error: null }),
-      onAuthStateChange: vi.fn((callback) => {
+      onAuthStateChange: vi.fn((_callback) => {
         // Optionally trigger callback with initial state
         return {
           data: {
@@ -49,9 +49,9 @@ export function createMockSupabaseClient(options: MockSupabaseOptions = {}) {
         };
       }),
     },
-    from: vi.fn((table: string) => createMockQueryBuilder(table)),
+    from: vi.fn((_table: string) => createMockQueryBuilder()),
     storage: {
-      from: vi.fn((bucket: string) => ({
+      from: vi.fn((_bucket: string) => ({
         upload: vi.fn().mockResolvedValue({ data: { path: 'test.txt' }, error: null }),
         download: vi.fn().mockResolvedValue({ data: new Blob(), error: null }),
         getPublicUrl: vi.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/file.txt' } }),
@@ -69,7 +69,7 @@ export function createMockSupabaseClient(options: MockSupabaseOptions = {}) {
 /**
  * Create a mock query builder for Supabase .from() calls.
  */
-function createMockQueryBuilder(table: string) {
+function createMockQueryBuilder() {
   const builder = {
     select: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),

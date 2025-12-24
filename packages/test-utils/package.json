@@ -11,7 +11,8 @@
     "./factories": "./src/factories/index.ts"
   },
   "dependencies": {
-    "@faker-js/faker": "^9.3.0"
+    "@faker-js/faker": "^9.3.0",
+    "@mantle/db": "workspace:*"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.47.0",

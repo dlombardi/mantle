@@ -5,44 +5,77 @@
  * features like listing, filtering, or validation.
  */
 
-import { BaseScenario, type ScenarioContext, type ScenarioResult } from './base-scenario';
-import { createUser, createPatterns, createRepo } from '../factories';
+import type { PatternType } from '@mantle/db';
+import { BaseScenario, type ScenarioContext, type ScenarioResult, type SeedData } from './base-scenario';
 import { TEST_USER } from './with-test-user';
+
+/** Well-known test repo ID */
+const TEST_REPO = {
+  id: '00000000-0000-0000-0000-000000000002',
+  githubId: 98765,
+  githubFullName: 'testuser/test-repo',
+  installationId: 11111,
+};
+
+/** Pattern types for variety - using actual schema enum values */
+const PATTERN_TYPES: PatternType[] = [
+  'naming',
+  'structural',
+  'api',
+  'testing',
+  'behavioral',
+];
 
 export class WithPatternsScenario extends BaseScenario {
   readonly name = 'with-patterns';
   readonly description = 'Test user with 5 sample patterns and a connected repo';
 
-  async seed(ctx: ScenarioContext): Promise<ScenarioResult> {
+  async seed(_ctx: ScenarioContext): Promise<ScenarioResult> {
     try {
-      // Create user
-      const user = createUser({
-        id: TEST_USER.id,
-        email: TEST_USER.email,
-        githubId: TEST_USER.githubId,
-        githubUsername: TEST_USER.githubUsername,
-      });
+      // Generate 5 patterns with varied types
+      const patternIds: string[] = [];
+      const patterns: SeedData['patterns'] = [];
 
-      // Create repo
-      const repo = createRepo({
-        userId: user.id,
-        status: 'ready',
-      });
-
-      // Create 5 patterns with varied tiers
-      const patterns = createPatterns(5, { repoId: repo.id });
-
-      // TODO: Insert into database when db client is available
-      // await ctx.db.insert(users).values(user);
-      // await ctx.db.insert(repos).values(repo);
-      // await ctx.db.insert(patterns).values(patterns);
+      for (let i = 0; i < 5; i++) {
+        const id = `00000000-0000-0000-0000-00000000010${i + 1}`;
+        patternIds.push(id);
+        patterns.push({
+          id,
+          repoId: TEST_REPO.id,
+          name: `Test Pattern ${i + 1}`,
+          description: `Description for test pattern ${i + 1}`,
+          type: PATTERN_TYPES[i],
+          extractedByModel: 'claude-sonnet-4-5-20250929',
+          status: i < 2 ? 'authoritative' : 'candidate',
+        });
+      }
 
       return {
         success: true,
+        data: {
+          users: [
+            {
+              id: TEST_USER.id,
+              githubId: TEST_USER.githubId,
+              githubUsername: TEST_USER.githubUsername,
+              email: TEST_USER.email,
+            },
+          ],
+          repos: [
+            {
+              id: TEST_REPO.id,
+              userId: TEST_USER.id,
+              githubId: TEST_REPO.githubId,
+              githubFullName: TEST_REPO.githubFullName,
+              installationId: TEST_REPO.installationId,
+            },
+          ],
+          patterns,
+        },
         createdIds: {
-          users: [user.id],
-          repos: [repo.id],
-          patterns: patterns.map((p) => p.id),
+          users: [TEST_USER.id],
+          repos: [TEST_REPO.id],
+          patterns: patternIds,
         },
       };
     } catch (error) {
@@ -54,23 +87,12 @@ export class WithPatternsScenario extends BaseScenario {
     }
   }
 
-  async cleanup(ctx: ScenarioContext, createdIds: ScenarioResult['createdIds']): Promise<void> {
-    // TODO: Delete in reverse order of creation (patterns, repos, users)
-    // if (createdIds.patterns) {
-    //   await ctx.db.delete(patterns).where(inArray(patterns.id, createdIds.patterns));
-    // }
-    // if (createdIds.repos) {
-    //   await ctx.db.delete(repos).where(inArray(repos.id, createdIds.repos));
-    // }
-    // if (createdIds.users) {
-    //   await ctx.db.delete(users).where(inArray(users.id, createdIds.users));
-    // }
+  async cleanup(_ctx: ScenarioContext, _createdIds: ScenarioResult['createdIds']): Promise<void> {
+    // Cleanup is handled by the seed route using createdIds
   }
 
-  async validate(ctx: ScenarioContext): Promise<boolean> {
-    // TODO: Verify all resources exist
-    // const patterns = await ctx.db.select().from(patterns).where(eq(patterns.repoId, repo.id));
-    // return patterns.length === 5;
+  async validate(_ctx: ScenarioContext): Promise<boolean> {
+    // Validation is handled by the seed route
     return true;
   }
 }

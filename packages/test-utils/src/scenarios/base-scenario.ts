@@ -2,13 +2,22 @@
  * Base Scenario - Abstract class for seed scenarios
  *
  * Extend this class to create new seed scenarios for QA verification.
+ *
+ * ARCHITECTURE NOTE: Scenarios return plain data objects. The API's seed
+ * route handles actual database insertions using Drizzle. This avoids
+ * circular dependencies between test-utils and api packages.
  */
+
+import type { SeedData } from '@mantle/db';
+
+// Re-export SeedData for convenience
+export type { SeedData };
 
 /**
  * Context passed to scenario methods
  */
 export interface ScenarioContext {
-  /** Database client (Drizzle or raw SQL) */
+  /** Database client - passed for cleanup operations */
   db: unknown;
   /** Supabase admin client for auth operations */
   supabase: unknown;
@@ -19,6 +28,8 @@ export interface ScenarioContext {
  */
 export interface ScenarioResult {
   success: boolean;
+  /** Data to be inserted by the seed route */
+  data?: SeedData;
   /** IDs of created resources for cleanup */
   createdIds: {
     users?: string[];
@@ -57,7 +68,7 @@ export abstract class BaseScenario {
    * @param ctx - Database and Supabase clients
    * @returns true if validation passes
    */
-  async validate(ctx: ScenarioContext): Promise<boolean> {
+  async validate(_ctx: ScenarioContext): Promise<boolean> {
     // Default: no validation
     return true;
   }

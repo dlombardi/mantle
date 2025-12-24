@@ -28,6 +28,8 @@ export interface QAHarnessConfig {
   beadId: string;
   /** Current iteration (1-3) */
   iteration: number;
+  /** Skip database seeding (for local testing without DB) */
+  skipSeed?: boolean;
 }
 
 export interface VerificationResult {
@@ -84,17 +86,23 @@ export async function runQAHarness(config: QAHarnessConfig): Promise<QAHarnessRe
     console.log(`      OK (${result.healthCheck.duration}ms)\n`);
 
     // Step 2: Parse checklist and seed
-    console.log('[2/4] Seeding...');
     const checklist = await parseChecklist(config.checklistPath);
-    const scenario = config.scenario ?? checklist.scenario ?? 'empty-repo';
-    result.seed = await seedPreview({
-      previewUrl: config.previewUrl,
-      scenario,
-    });
-    if (!result.seed.success) {
-      throw new Error(`Seed failed: ${result.seed.error}`);
+
+    if (config.skipSeed) {
+      console.log('[2/4] Seeding... SKIPPED\n');
+      result.seed = { success: true, scenario: 'none', duration: 0 };
+    } else {
+      console.log('[2/4] Seeding...');
+      const scenario = config.scenario ?? checklist.scenario ?? 'empty-repo';
+      result.seed = await seedPreview({
+        previewUrl: config.previewUrl,
+        scenario,
+      });
+      if (!result.seed.success) {
+        throw new Error(`Seed failed: ${result.seed.error}`);
+      }
+      console.log(`      OK (${result.seed.duration}ms)\n`);
     }
-    console.log(`      OK (${result.seed.duration}ms)\n`);
 
     // Step 3: Run browser verifications
     console.log('[3/4] Running verifications...');

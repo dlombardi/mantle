@@ -13,14 +13,20 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
+    "test:qa-harness": "bun run e2e/harness/cli.ts",
     "test:all": "turbo test && playwright test",
-    "clean": "turbo clean && rm -rf node_modules"
+    "clean": "turbo clean && rm -rf node_modules",
+    "vercel:login": "vercel login",
+    "vercel:link": "vercel link",
+    "vercel:deploy": "vercel deploy",
+    "vercel:preview": "vercel"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.1.0",
     "@playwright/test": "^1.57.0",
     "turbo": "^2.3.3",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vercel": "^50.1.3"
   },
   "engines": {
     "node": ">=18.17.0"

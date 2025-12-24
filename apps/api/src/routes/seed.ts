@@ -8,6 +8,8 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { getDb, users, repos, patterns, type SeedData } from '../lib/db';
+import { sql } from 'drizzle-orm';
 
 /**
  * Check if we're in a seedable environment (dev or preview)
@@ -23,6 +25,70 @@ function isSeedableEnvironment(): boolean {
   if (!vercelEnv && nodeEnv !== 'production') return true;
 
   return false;
+}
+
+/**
+ * Insert seed data into the database with upsert behavior.
+ * This allows re-running scenarios without duplicate key errors.
+ */
+async function insertSeedData(db: ReturnType<typeof getDb>, data: SeedData): Promise<void> {
+  // Insert users first (no FK dependencies)
+  if (data.users && data.users.length > 0) {
+    for (const user of data.users) {
+      await db
+        .insert(users)
+        .values(user)
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            githubId: user.githubId,
+            githubUsername: user.githubUsername,
+            email: user.email,
+            avatarUrl: user.avatarUrl,
+            updatedAt: sql`now()`,
+          },
+        });
+    }
+  }
+
+  // Insert repos (depends on users)
+  if (data.repos && data.repos.length > 0) {
+    for (const repo of data.repos) {
+      await db
+        .insert(repos)
+        .values(repo)
+        .onConflictDoUpdate({
+          target: repos.id,
+          set: {
+            githubFullName: repo.githubFullName,
+            installationId: repo.installationId,
+            defaultBranch: repo.defaultBranch ?? 'main',
+            private: repo.private ?? false,
+            updatedAt: sql`now()`,
+          },
+        });
+    }
+  }
+
+  // Insert patterns (depends on repos)
+  if (data.patterns && data.patterns.length > 0) {
+    for (const pattern of data.patterns) {
+      await db
+        .insert(patterns)
+        .values(pattern)
+        .onConflictDoUpdate({
+          target: patterns.id,
+          set: {
+            name: pattern.name,
+            description: pattern.description,
+            type: pattern.type,
+            status: pattern.status ?? 'candidate',
+            extractedByModel: pattern.extractedByModel,
+            updatedAt: sql`now()`,
+          },
+        });
+    }
+  }
 }
 
 // Request schema
@@ -71,10 +137,10 @@ seedRoutes.post('/', zValidator('json', seedRequestSchema), async (c) => {
 
     const scenarioInstance = getScenario(scenario);
 
-    // TODO: Pass actual db and supabase clients when available
+    const db = getDb();
     const result = await scenarioInstance.seed({
-      db: null,
-      supabase: null,
+      db,
+      supabase: null, // TODO: Add supabase client for auth operations if needed
     });
 
     if (!result.success) {
@@ -89,10 +155,16 @@ seedRoutes.post('/', zValidator('json', seedRequestSchema), async (c) => {
       );
     }
 
+    // Insert the seed data into the database
+    if (result.data) {
+      await insertSeedData(db, result.data);
+    }
+
     return c.json({
       success: true,
       scenario,
       message: `Scenario '${scenario}' loaded successfully`,
+      createdIds: result.createdIds,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -169,8 +241,9 @@ seedRoutes.delete('/', async (c) => {
 
     const emptyScenario = getScenario('empty-repo');
 
+    const db = getDb();
     await emptyScenario.seed({
-      db: null,
+      db,
       supabase: null,
     });
 

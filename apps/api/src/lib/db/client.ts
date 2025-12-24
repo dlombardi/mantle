@@ -10,7 +10,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { sql } from 'drizzle-orm';
 import postgres from 'postgres';
-import * as schema from './schema';
+import * as schema from '@mantle/db/schema';
 
 // Singleton instances
 let client: ReturnType<typeof postgres> | null = null;
