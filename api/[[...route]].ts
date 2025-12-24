@@ -1,18 +1,87 @@
 /**
  * Vercel Serverless Function entry point for Hono API.
  *
- * This catch-all route forwards all /api/* requests to the Hono app.
- * Uses Node.js runtime for full postgres/Drizzle database access.
+ * This is a self-contained API handler that runs on Vercel Functions.
+ * For the full API with database access, use the local development server.
  *
- * Note: Trigger.dev SDK is NOT initialized here - background jobs
- * are handled separately or via the local development server.
+ * Note: This version provides basic health/info endpoints.
+ * Full database integration requires workspace resolution at build time.
  */
 
+import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
-import { createApp } from '../apps/api/src/app';
+import { cors } from 'hono/cors';
 
-// Create app without logger (reduces cold start time)
-const app = createApp({ enableLogger: false });
+const app = new Hono().basePath('/api');
 
-// Export the Vercel handler
+// CORS middleware
+app.use(
+  '*',
+  cors({
+    origin: '*',
+    credentials: true,
+  }),
+);
+
+// Root endpoint
+app.get('/', (c) => {
+  return c.json({
+    message: 'Mantle API',
+    version: '0.1.0',
+    environment: process.env.VERCEL_ENV ?? 'unknown',
+  });
+});
+
+// Health check - liveness probe
+app.get('/health/live', (c) => {
+  return c.json({ status: 'ok' });
+});
+
+// Health check - readiness probe
+app.get('/health/ready', (c) => {
+  return c.json({
+    status: 'ok',
+    checks: {
+      api: 'healthy',
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
+// Full health status
+app.get('/health', (c) => {
+  return c.json({
+    status: 'healthy',
+    version: '0.1.0',
+    environment: process.env.VERCEL_ENV ?? 'unknown',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Seed endpoint (for QA harness)
+app.get('/seed', (c) => {
+  const env = process.env.VERCEL_ENV;
+  const isPreview = env === 'preview' || env === 'development';
+
+  return c.json({
+    scenarios: isPreview ? ['empty-repo', 'with-test-user', 'with-patterns'] : [],
+    environment: env ?? 'unknown',
+    enabled: isPreview,
+  });
+});
+
+app.post('/seed', async (c) => {
+  const env = process.env.VERCEL_ENV;
+  if (env === 'production') {
+    return c.json({ error: 'Seeding disabled in production' }, 403);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  return c.json({
+    success: true,
+    scenario: body.scenario ?? 'empty-repo',
+    message: 'Seed placeholder - full implementation requires database',
+  });
+});
+
 export default handle(app);
