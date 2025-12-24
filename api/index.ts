@@ -1,18 +1,14 @@
 /**
  * Vercel Serverless Function entry point for Hono API.
  *
- * This is a self-contained API handler that runs on Vercel Functions.
- * For the full API with database access, use the local development server.
- *
- * Note: This version provides basic health/info endpoints.
- * Full database integration requires workspace resolution at build time.
+ * Exports the Hono app directly for Vercel's zero-config deployment.
+ * See: https://hono.dev/docs/getting-started/vercel
  */
 
 import { Hono } from 'hono';
-import { handle } from 'hono/vercel';
 import { cors } from 'hono/cors';
 
-const app = new Hono().basePath('/api');
+const app = new Hono();
 
 // CORS middleware
 app.use(
@@ -84,4 +80,4 @@ app.post('/seed', async (c) => {
   });
 });
 
-export default handle(app);
+export default app;
