@@ -44,3 +44,4 @@ USER hono
 EXPOSE 3001
 
 CMD ["bun", "run", "dist/index.js"]
+
