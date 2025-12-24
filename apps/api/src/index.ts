@@ -1,8 +1,8 @@
 /**
- * Local development server entry point.
+ * Hono API server entry point.
  *
- * This file runs the Hono app as a Bun server for local development.
- * For Vercel deployment, see api/[[...route]].ts in the repo root.
+ * This file runs the Hono app as a Bun server.
+ * Used for both local development and Railway deployment.
  */
 
 import { closeDb } from './lib/db';
