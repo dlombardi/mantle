@@ -2,11 +2,13 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { HTTPException } from 'hono/http-exception';
+import { trpcServer } from '@hono/trpc-server';
 import { ZodError } from 'zod';
-import { closeDb } from './lib/db';
+import { closeDb, getDb } from './lib/db';
 import { initTrigger } from './lib/trigger';
 import { healthRoutes } from './routes/health';
 import { exampleRoutes } from './routes/example';
+import { appRouter, createContext } from '@mantle/trpc';
 
 // Initialize Trigger.dev SDK
 initTrigger();
@@ -36,6 +38,23 @@ app.route('/health', healthRoutes);
 
 // Example routes (demonstrates validation patterns)
 app.route('/example', exampleRoutes);
+
+// tRPC routes - type-safe RPC endpoints
+app.use(
+  '/trpc/*',
+  trpcServer({
+    router: appRouter,
+    endpoint: '/api/trpc',
+    createContext: async ({ req }) => {
+      return createContext({
+        req,
+        getDb,
+        // TODO: Add user extraction from JWT
+        getUser: async () => null,
+      });
+    },
+  }),
+);
 
 // Global error handler
 app.onError((err, c) => {
