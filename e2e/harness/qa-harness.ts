@@ -30,6 +30,8 @@ export interface QAHarnessConfig {
   iteration: number;
   /** Skip database seeding (for local testing without DB) */
   skipSeed?: boolean;
+  /** Vercel deployment protection bypass token */
+  bypassToken?: string;
 }
 
 export interface VerificationResult {
@@ -51,6 +53,15 @@ export interface QAHarnessResult {
 }
 
 /**
+ * Apply bypass token to a URL for Vercel deployment protection
+ */
+function applyBypassToken(url: string, bypassToken?: string): string {
+  if (!bypassToken) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}x-vercel-protection-bypass=${bypassToken}`;
+}
+
+/**
  * Run the full QA harness verification cycle
  */
 export async function runQAHarness(config: QAHarnessConfig): Promise<QAHarnessResult> {
@@ -62,7 +73,11 @@ export async function runQAHarness(config: QAHarnessConfig): Promise<QAHarnessRe
   console.log('================\n');
   console.log(`Preview URL: ${config.previewUrl}`);
   console.log(`Checklist: ${config.checklistPath}`);
-  console.log(`Iteration: ${config.iteration}/3\n`);
+  console.log(`Iteration: ${config.iteration}/3`);
+  if (config.bypassToken) {
+    console.log(`Bypass Token: ****${config.bypassToken.slice(-4)}`);
+  }
+  console.log();
 
   const result: QAHarnessResult = {
     success: false,
@@ -79,7 +94,7 @@ export async function runQAHarness(config: QAHarnessConfig): Promise<QAHarnessRe
   try {
     // Step 1: Health check
     console.log('[1/4] Health check...');
-    result.healthCheck = await healthCheck(config.previewUrl, timeout);
+    result.healthCheck = await healthCheck(config.previewUrl, timeout, config.bypassToken);
     if (!result.healthCheck.ok) {
       throw new Error(`Health check failed: ${result.healthCheck.error}`);
     }
@@ -97,6 +112,7 @@ export async function runQAHarness(config: QAHarnessConfig): Promise<QAHarnessRe
       result.seed = await seedPreview({
         previewUrl: config.previewUrl,
         scenario,
+        bypassToken: config.bypassToken,
       });
       if (!result.seed.success) {
         throw new Error(`Seed failed: ${result.seed.error}`);
@@ -112,7 +128,7 @@ export async function runQAHarness(config: QAHarnessConfig): Promise<QAHarnessRe
     for (const verification of checklist.verifications) {
       const verificationStart = Date.now();
       try {
-        const passed = await runVerification(page, config.previewUrl, verification);
+        const passed = await runVerification(page, config.previewUrl, verification, config.bypassToken);
         const duration = Date.now() - verificationStart;
 
         result.verifications.push({
@@ -191,10 +207,11 @@ export async function runQAHarness(config: QAHarnessConfig): Promise<QAHarnessRe
  */
 async function healthCheck(
   previewUrl: string,
-  timeout: number
+  timeout: number,
+  bypassToken?: string
 ): Promise<{ ok: boolean; error?: string; duration: number }> {
   const start = Date.now();
-  const healthUrl = `${previewUrl}/api/health/live`;
+  const healthUrl = applyBypassToken(`${previewUrl}/api/health/live`, bypassToken);
 
   const maxRetries = 3;
   const retryDelay = 10000;
@@ -291,9 +308,11 @@ async function parseChecklist(checklistPath: string): Promise<ParsedChecklist> {
 async function runVerification(
   page: Page,
   previewUrl: string,
-  verification: ChecklistVerification
+  verification: ChecklistVerification,
+  bypassToken?: string
 ): Promise<boolean> {
-  await page.goto(previewUrl, { waitUntil: 'networkidle' });
+  const targetUrl = applyBypassToken(previewUrl, bypassToken);
+  await page.goto(targetUrl, { waitUntil: 'networkidle' });
 
   const consoleErrors: string[] = [];
   page.on('console', (msg) => {

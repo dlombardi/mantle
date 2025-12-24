@@ -29,6 +29,7 @@ interface ParsedArgs {
   headed: boolean;
   timeout: number;
   skipSeed: boolean;
+  bypassToken?: string;
   help: boolean;
 }
 
@@ -38,6 +39,8 @@ function parseArgs(args: string[]): ParsedArgs {
     headed: false,
     timeout: 300,
     skipSeed: false,
+    // Read bypass token from environment variable as default
+    bypassToken: process.env.VERCEL_PROTECTION_BYPASS,
     help: false,
   };
 
@@ -60,6 +63,8 @@ function parseArgs(args: string[]): ParsedArgs {
       result.scenario = arg.slice('--scenario='.length);
     } else if (arg.startsWith('--timeout=')) {
       result.timeout = parseInt(arg.slice('--timeout='.length), 10) || 300;
+    } else if (arg.startsWith('--bypass-token=')) {
+      result.bypassToken = arg.slice('--bypass-token='.length);
     }
   }
 
@@ -84,6 +89,8 @@ Optional:
   --headed              Run browser in headed mode (default: headless)
   --timeout=<seconds>   Timeout in seconds (default: 300)
   --skip-seed           Skip database seeding (for local testing)
+  --bypass-token=<tok>  Vercel deployment protection bypass token
+                        (or set VERCEL_PROTECTION_BYPASS env var)
   --help, -h            Show this help message
 
 Examples:
@@ -147,6 +154,7 @@ async function main(): Promise<void> {
     headless: !args.headed,
     timeout: args.timeout * 1000,
     skipSeed: args.skipSeed,
+    bypassToken: args.bypassToken,
   });
 
   // Exit with appropriate code

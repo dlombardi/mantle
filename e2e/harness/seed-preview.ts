@@ -12,6 +12,8 @@ export interface SeedConfig {
   scenario: string;
   /** Timeout in milliseconds (default: 30000) */
   timeout?: number;
+  /** Vercel deployment protection bypass token */
+  bypassToken?: string;
 }
 
 export interface SeedResult {
@@ -22,12 +24,21 @@ export interface SeedResult {
 }
 
 /**
+ * Apply bypass token to a URL for Vercel deployment protection
+ */
+function applyBypassToken(url: string, bypassToken?: string): string {
+  if (!bypassToken) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}x-vercel-protection-bypass=${bypassToken}`;
+}
+
+/**
  * Seed the preview deployment with test data
  */
 export async function seedPreview(config: SeedConfig): Promise<SeedResult> {
   const start = Date.now();
   const timeout = config.timeout ?? 30000;
-  const seedUrl = `${config.previewUrl}/api/seed`;
+  const seedUrl = applyBypassToken(`${config.previewUrl}/api/seed`, config.bypassToken);
 
   try {
     const controller = new AbortController();
