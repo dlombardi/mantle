@@ -35,20 +35,6 @@ Invoke this skill when working on:
 
 ---
 
-## Beads Integration
-
-Track testing work with beads:
-```bash
-# Adding tests for a feature
-bd create "Add tests for user settings API"
-bd update <id> -s in-progress
-
-# Complete when passing
-bun run test && bd complete <id>
-```
-
----
-
 ## Tech Stack
 
 | Layer | Technology | Purpose |

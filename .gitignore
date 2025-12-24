@@ -48,3 +48,6 @@ next-env.d.ts
 
 # Supabase
 supabase/.temp/
+
+# bv (beads viewer) local config and caches
+.bv/

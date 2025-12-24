@@ -33,27 +33,13 @@ Invoke this skill when working on:
 
 ---
 
-## Beads Integration
-
-Track Hono work with beads:
-```bash
-# Adding a new route
-bd create "Add PATCH /api/preferences/:id route"
-bd update <id> -s in-progress
-
-# Complete when working
-bun run typecheck && bd complete <id>
-```
-
----
-
 ## Tech Stack
 
 | Layer | Technology | Version |
 |-------|------------|---------|
 | Runtime | Bun | 1.3.0 |
 | Framework | Hono | 4.6.14 |
-| tRPC Adapter | @hono/trpc-server | 0.3.0 |
+| tRPC Adapter | @hono/trpc-server | 0.3.3 |
 | Server Adapter | @hono/node-server | 1.13.7 |
 | Validation | @hono/zod-validator | 0.4.2 |
 

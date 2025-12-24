@@ -32,104 +32,75 @@ epics:
   - id: "epic-foundation"
     title: "Establish infrastructure, auth, and core data model"
     description: |
-      Set up the foundational infrastructure including Next.js on Vercel, Supabase for 
-      database and auth, Trigger.dev for background jobs, and GitHub App for repo integration.
+      Set up the foundational infrastructure including Hono backend (Bun runtime),
+      Vite + TanStack Router frontend, Supabase for database and auth, Trigger.dev for
+      background jobs, and GitHub App for repo integration. Uses tRPC for type-safe API calls.
       User should be able to log in, install the GitHub App, and see repos in an empty dashboard.
-    prd_refs: ["Section 6.2 Phase 1", "D4", "D7", "D15"]
+    prd_refs: ["Section 6.2 Phase 1", "D4", "D7", "D15", "D37"]
     effort_days: 5
     stories:
       - id: "story-project-setup"
         title: "Initialize project infrastructure"
         description: |
-          Set up the core project structure with Next.js, Supabase, and Trigger.dev deployments.
-        prd_refs: ["Task 1.1", "Task 1.2", "Task 1.3"]
-        effort_hours: 8
+          Set up the monorepo structure with Hono backend, Vite frontend, Supabase,
+          and Trigger.dev for background jobs. Includes tRPC for type-safe API calls.
+        prd_refs: ["Task 1.1", "Task 1.2", "Task 1.3", "Task 1.10", "D37"]
+        effort_hours: 10
         acceptance_criteria:
-          - "Next.js project deployed to Vercel with working preview URL"
-          - "Supabase project created with Postgres database accessible"
-          - "Trigger.dev project connected to Vercel deployment"
+          - "Monorepo with apps/api (Hono) and apps/web (Vite) working"
+          - "Supabase project created with Postgres database accessible via Drizzle ORM"
+          - "Trigger.dev project connected to API app"
+          - "tRPC router shared between frontend and backend"
           - "All environment variables documented in .env.example"
         tasks:
-          - id: "task-1.1-nextjs-init"
-            title: "Initialize Next.js project and deploy to Vercel"
+          - id: "task-1.1-monorepo-init"
+            title: "Initialize monorepo with Hono backend and Vite frontend"
             description: |
-              Create Next.js 14+ project with App Router, TypeScript, Tailwind CSS.
-              Configure Vercel deployment with preview environments.
+              Create Turborepo monorepo with Bun workspaces. Set up apps/api (Hono)
+              and apps/web (Vite + React + TanStack Router). Configure shared packages.
             type: "task"
             priority: 0
-            effort_hours: 3
-            prd_refs: ["Task 1.1", "D7"]
+            effort_hours: 4
+            prd_refs: ["Task 1.1", "D37"]
             blocked_by: []
             related_to: []
             acceptance_criteria:
-              - "Next.js project with TypeScript and Tailwind configured"
-              - "Vercel deployment working with automatic previews on PR"
-              - "Basic health check endpoint responding"
-            implementation:
-              files:
-                - "package.json"
-                - "next.config.js"
-                - "tailwind.config.js"
-                - "tsconfig.json"
-              dependencies:
-                - "next@14"
-                - "typescript"
-                - "tailwindcss"
-              notes: |
-                Per D7: Tech stack is Supabase + Vercel + Trigger.dev.
-                Use App Router for all routes.
-
+              - "Turborepo monorepo with Bun workspaces configured"
+              - "apps/api with Hono running on port 3001"
+              - "apps/web with Vite + TanStack Router running on port 3000"
+              - "Basic health check endpoint responding at /api/health"
+              - "TypeScript and Tailwind CSS v4 configured"
           - id: "task-1.2-supabase-setup"
-            title: "Set up Supabase project with Postgres and Auth"
+            title: "Set up Supabase project with Postgres and Drizzle ORM"
             description: |
-              Create Supabase project, configure database connection, enable auth providers.
+              Create Supabase project, configure database connection with Drizzle ORM,
+              enable auth providers. Set up both API and web clients.
             type: "task"
             priority: 0
-            effort_hours: 2
-            prd_refs: ["Task 1.2", "D6", "D7"]
+            effort_hours: 3
+            prd_refs: ["Task 1.2", "D6", "D37"]
             blocked_by: []
             related_to: []
             acceptance_criteria:
               - "Supabase project created in production region"
               - "Database connection string available"
+              - "Drizzle ORM configured with schema in apps/api/src/lib/db/"
               - "GitHub OAuth provider enabled in Supabase Auth"
-            implementation:
-              files:
-                - "lib/supabase/client.ts"
-                - "lib/supabase/server.ts"
-              dependencies:
-                - "@supabase/supabase-js"
-                - "@supabase/ssr"
-              notes: |
-                Per D6: Own database for pattern storage (not patterns-as-code).
-                Per D7: Supabase provides excellent Postgres DX, realtime subscriptions.
-                Configure Realtime for repos table (ingestion/extraction status updates).
-
           - id: "task-1.3-triggerdev-setup"
-            title: "Set up Trigger.dev project and connect to Vercel"
+            title: "Set up Trigger.dev project and connect to API app"
             description: |
-              Initialize Trigger.dev for background job processing. Configure connection to Vercel.
+              Initialize Trigger.dev for background job processing. Configure connection
+              to Hono API app.
             type: "task"
             priority: 0
             effort_hours: 2
-            prd_refs: ["Task 1.3", "D7"]
-            blocked_by: []
+            prd_refs: ["Task 1.3", "D37"]
+            blocked_by: ["task-1.1-monorepo-init"]
             related_to: []
             acceptance_criteria:
               - "Trigger.dev project created and linked to repo"
               - "Test job can be triggered and observed in dashboard"
-              - "Environment variables synchronized with Vercel"
-            implementation:
-              files:
-                - "trigger.config.ts"
-                - "jobs/index.ts"
-              dependencies:
-                - "@trigger.dev/sdk"
-                - "@trigger.dev/nextjs"
-              notes: |
-                Per D7: Trigger.dev handles long-running extraction jobs with good observability.
-                Configure retry logic: max 3 attempts with exponential backoff.
-
+              - "SDK configured in apps/api"
       - id: "story-github-app"
         title: "GitHub App setup and OAuth integration"
         description: |
@@ -159,23 +130,6 @@ epics:
               - "Permissions: repo contents read, PRs read/write, status checks write"
               - "Webhook URL configured for PR events"
               - "Private key generated and stored securely"
-            implementation:
-              files:
-                - "docs/github-app-setup.md"
-              dependencies: []
-              notes: |
-                Per D4: GitHub App auth model provides native webhooks, PR comments as app identity,
-                and status checks integration. More setup complexity but better UX and product positioning.
-                
-                Required permissions:
-                - Repository: Contents (Read)
-                - Repository: Pull requests (Read & Write)
-                - Repository: Commit statuses (Read & Write)
-                - Repository: Metadata (Read)
-                
-                Webhook events to subscribe:
-                - Pull request (opened, synchronize)
-
           - id: "task-1.5-github-oauth"
             title: "Implement GitHub OAuth flow for user login"
             description: |
@@ -191,19 +145,6 @@ epics:
               - "User record created in database with GitHub ID and username"
               - "Session persisted across page refreshes"
               - "Logout functionality works correctly"
-            implementation:
-              files:
-                - "app/auth/callback/route.ts"
-                - "app/login/page.tsx"
-                - "components/auth/login-button.tsx"
-                - "lib/auth/session.ts"
-              dependencies:
-                - "@supabase/ssr"
-              notes: |
-                Use Supabase Auth's built-in GitHub provider.
-                Store additional user metadata (avatarUrl, email) from GitHub profile.
-                Per D22: User identity needed for pattern ownership attribution.
-
           - id: "task-1.7-installation-flow"
             title: "Implement GitHub App installation flow with repo selection"
             description: |
@@ -219,20 +160,6 @@ epics:
               - "After installation, redirected back to app with installation_id"
               - "User can see and select from repos accessible to the installation"
               - "Selected repos stored in database linked to user"
-            implementation:
-              files:
-                - "app/api/github/callback/route.ts"
-                - "app/repos/connect/page.tsx"
-                - "components/repos/repo-selector.tsx"
-                - "lib/github/installation.ts"
-              dependencies:
-                - "@octokit/auth-app"
-                - "@octokit/rest"
-              notes: |
-                Per D5: Multi-repo support from day 1. repoId as first-class FK.
-                Installation callback URL must be registered in GitHub App settings.
-                Handle both new installations and modified installations (repo access changes).
-
       - id: "story-core-schema"
         title: "Design and implement core database schema"
         description: |
@@ -263,31 +190,6 @@ epics:
               - "JSONB columns for confidenceScore, healthSignals, backtestSummary"
               - "CASCADE deletes configured (pattern → backtest_violations)"
               - "Indexes on frequently queried columns (repoId, status, patternId)"
-            implementation:
-              files:
-                - "supabase/migrations/001_initial_schema.sql"
-                - "lib/db/types.ts"
-                - "lib/db/schema.ts"
-              dependencies: []
-              notes: |
-                Core tables per Section 2.4:
-                - users (synced from Supabase Auth)
-                - repos (with ingestionStatus, extractionStatus, tokenCount)
-                - patterns (with confidenceScore JSONB, healthSignals JSONB, backtestSummary JSONB)
-                - pattern_evidence (with codeCategory, capturedAtSha, isStale)
-                - filesystem_pattern_evidence (for file-naming/file-structure patterns)
-                - provenance (links patterns to decision history)
-                - pull_requests (with diffStoragePath per D28)
-                - violations (with dismissalReason, isFalsePositive per D26)
-                - backtest_violations (separate table per D12)
-                - pattern_evolution_requests (per D27)
-                - context_file_configs (per D32)
-                - repo_files (for evidence autocomplete per D21)
-                
-                RLS policies:
-                - Users can only access repos they own
-                - Patterns/violations inherit access from parent repo
-
           - id: "task-1.8-installation-token"
             title: "Implement on-demand GitHub token generation utility"
             description: |
@@ -304,48 +206,23 @@ epics:
               - "Token automatically refreshed before expiry by @octokit/auth-app"
               - "Installation ID stored in repos table"
               - "No tokens stored in database"
-            implementation:
-              files:
-                - "lib/github/auth.ts"
-                - "lib/github/octokit.ts"
-              dependencies:
-                - "@octokit/auth-app"
-              notes: |
-                Per D15: GitHub tokens are on-demand, never stored in DB.
-                @octokit/auth-app handles caching and refresh automatically.
-                For long-running jobs, create one Octokit instance at job start and reuse.
-                Private key from GITHUB_APP_PRIVATE_KEY env var.
-
           - id: "task-1.9-env-config"
             title: "Configure environment variables across all services"
             description: |
-              Set up GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET 
-              in Vercel, Trigger.dev, and document in .env.example.
+              Set up GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET
+              and document in .env.example files for API and web apps.
             type: "task"
             priority: 0
             effort_hours: 1
-            prd_refs: ["Task 1.9", "D15"]
+            prd_refs: ["Task 1.9", "D15", "D37"]
             blocked_by: ["task-1.4-github-app-setup"]
             related_to: []
             acceptance_criteria:
-              - "All required env vars documented in .env.example"
-              - "Vercel environment variables configured for production/preview"
-              - "Trigger.dev environment variables synced"
-              - "Local .env.local working for development"
-            implementation:
-              files:
-                - ".env.example"
-                - "docs/deployment.md"
-              dependencies: []
-              notes: |
-                Required environment variables:
-                - GITHUB_APP_ID
-                - GITHUB_APP_PRIVATE_KEY (multi-line, base64 encode if needed)
-                - GITHUB_WEBHOOK_SECRET
-                - NEXT_PUBLIC_SUPABASE_URL
-                - SUPABASE_SERVICE_ROLE_KEY
-                - ANTHROPIC_API_KEY
-
+              - "All required env vars documented in .env.example files"
+              - "apps/api/.env.example for backend vars"
+              - "apps/web/.env.example for frontend vars (VITE_ prefix)"
+              - "Trigger.dev environment variables configured"
+              - "Local development working with .env files"
   # ============================================
   # EPIC 2: INGESTION
   # ============================================
@@ -384,19 +261,6 @@ epics:
               - "Can fetch individual file contents"
               - "Rate limiting handled with exponential backoff"
               - "Respects X-RateLimit-Remaining header"
-            implementation:
-              files:
-                - "lib/github/contents.ts"
-                - "lib/github/rate-limit.ts"
-              dependencies:
-                - "@octokit/rest"
-              notes: |
-                Use GitHub Trees API for efficient file listing:
-                GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1
-                
-                For content, use Contents API or download tarball for efficiency.
-                Per D10: Target repos are 50-200 files (~60-240k tokens).
-
           - id: "task-2.2-file-tree-indexer"
             title: "Build file tree indexer with metadata"
             description: |
@@ -412,21 +276,6 @@ epics:
               - "File tree indexed with path, language detection, size"
               - "Binary files and irrelevant paths excluded"
               - "Language detection working for common languages"
-            implementation:
-              files:
-                - "lib/ingestion/file-tree.ts"
-                - "lib/ingestion/language-detect.ts"
-                - "lib/ingestion/filters.ts"
-              dependencies: []
-              notes: |
-                Exclude patterns:
-                - node_modules/, vendor/, .git/
-                - Binary files (images, compiled assets)
-                - Lock files (package-lock.json, yarn.lock)
-                
-                Use file extension for language detection.
-                Store fileCount in Repo record.
-
           - id: "task-2.3-content-chunking"
             title: "Implement content chunking strategy"
             description: |
@@ -441,16 +290,6 @@ epics:
               - "File contents prepared for LLM context"
               - "Format includes file path and content"
               - "Token estimation available per file"
-            implementation:
-              files:
-                - "lib/ingestion/chunking.ts"
-              dependencies: []
-              notes: |
-                Per D10: Full-repo single-pass extraction with 1M context.
-                Target repos fit comfortably in 600k token budget.
-                MVP uses file-level chunking (one file = one chunk).
-                Post-MVP: smart chunking with directory-based splitting.
-
           - id: "task-2.4-ingest-job"
             title: "Create Trigger.dev ingestRepo job"
             description: |
@@ -467,21 +306,6 @@ epics:
               - "Updates ingestionStatus through pending → ingesting → ingested/failed"
               - "All sub-tasks (file tree, git history, PRs) executed in order"
               - "Errors captured and stored in Repo.lastError"
-            implementation:
-              files:
-                - "jobs/ingest-repo.ts"
-              dependencies:
-                - "@trigger.dev/sdk"
-              notes: |
-                Job orchestrates:
-                1. Fetch file tree (task 2.2)
-                2. Calculate token count (task 2.12)
-                3. Fetch git history (task 2.7, 2.8)
-                4. Fetch PR history (task 2.10)
-                5. Store indexed paths (task 2.13)
-                
-                Inferred dependency: Must complete before extraction can start.
-
           - id: "task-2.5-store-indexed-content"
             title: "Store indexed content and file references"
             description: |
@@ -495,14 +319,6 @@ epics:
             acceptance_criteria:
               - "File tree stored in database linked to repo"
               - "Content accessible for extraction phase"
-            implementation:
-              files:
-                - "lib/db/repos.ts"
-              dependencies: []
-              notes: |
-                Content can be stored in Supabase Storage or fetched on-demand during extraction.
-                For MVP, fetch on-demand to avoid storage costs.
-
       - id: "story-git-metadata"
         title: "Git history and PR metadata collection"
         description: |
@@ -529,19 +345,6 @@ epics:
               - "Commit history retrieved for past 2 years"
               - "Author, date, and SHA available per commit"
               - "Rate limiting handled appropriately"
-            implementation:
-              files:
-                - "lib/github/commits.ts"
-              dependencies:
-                - "@octokit/rest"
-              notes: |
-                Per D11: Git history enables confidence scoring dimensions:
-                - Adoption (unique authors)
-                - Establishment (pattern age)
-                
-                Use GET /repos/{owner}/{repo}/commits with since parameter.
-                Store commits in memory during job, not persisted separately.
-
           - id: "task-2.8-git-blame"
             title: "Extract per-file author metadata via git blame"
             description: |
@@ -557,17 +360,6 @@ epics:
               - "Author username extracted per file"
               - "Commit date (pattern introduction time) available"
               - "Commit SHA available for GitHub links"
-            implementation:
-              files:
-                - "lib/github/blame.ts"
-              dependencies: []
-              notes: |
-                Use GitHub Blame API or GraphQL for efficient blame data.
-                For multi-line evidence, use startLine to determine author/commit.
-                This captures the "signature" line where patterns typically begin.
-                
-                Alternative: Parse git blame output from cloned repo.
-
           - id: "task-2.9-file-metadata"
             title: "Store file metadata for extraction"
             description: |
@@ -582,14 +374,6 @@ epics:
             acceptance_criteria:
               - "File metadata stored with repo reference"
               - "Language and size available for filtering"
-            implementation:
-              files:
-                - "lib/db/files.ts"
-              dependencies: []
-              notes: |
-                Per D25: Location classification (core/feature/frontend/etc.) is 
-                done by LLM during extraction, not by path heuristics.
-
           - id: "task-2.10-pr-history"
             title: "Fetch recent merged PRs for backtest (D28)"
             description: |
@@ -606,23 +390,6 @@ epics:
               - "Diff content stored in Supabase Storage"
               - "PR metadata stored with diffStoragePath reference"
               - "Rate limiting handled with backoff"
-            implementation:
-              files:
-                - "lib/github/pull-requests.ts"
-                - "lib/storage/pr-diffs.ts"
-              dependencies: []
-              notes: |
-                Per D28: Store full patch content in Supabase Storage.
-                Path format: pr_diffs/{repo_id}/{pr_number}.patch
-                
-                API calls:
-                1. GET /repos/{owner}/{repo}/pulls?state=closed&sort=updated&direction=desc
-                2. Filter to merged PRs
-                3. GET /repos/{owner}/{repo}/pulls/{number}/files for each
-                
-                If rate limited mid-fetch, proceed with PRs fetched so far.
-                Store diffStoragePath in PullRequest record.
-
       - id: "story-ingestion-ui"
         title: "Ingestion UI and progress tracking"
         description: |
@@ -648,16 +415,6 @@ epics:
               - "File tree displayed in expandable tree view"
               - "Ingestion status shown (pending/ingesting/ingested/failed)"
               - "File count and basic stats visible"
-            implementation:
-              files:
-                - "app/repos/[id]/page.tsx"
-                - "components/repos/file-tree.tsx"
-                - "components/repos/ingestion-status.tsx"
-              dependencies: []
-              notes: |
-                Use tree component with lazy loading for large repos.
-                Show file count, language breakdown stats.
-
           - id: "task-2.11-progress-tracking"
             title: "Implement ingestion progress tracking with Realtime"
             description: |
@@ -672,16 +429,6 @@ epics:
               - "Progress steps visible: files indexed, git history fetched, PRs fetched"
               - "Real-time updates via Supabase Realtime subscription"
               - "UI reflects current progress without refresh"
-            implementation:
-              files:
-                - "hooks/use-repo-status.ts"
-                - "components/repos/progress-tracker.tsx"
-              dependencies: []
-              notes: |
-                Subscribe to repos table UPDATE events.
-                Display step-by-step progress: Files → Git History → PRs → Complete.
-                Unsubscribe on component unmount.
-
           - id: "task-2.12-token-count"
             title: "Calculate token count and enforce limit"
             description: |
@@ -696,18 +443,6 @@ epics:
               - "Token count calculated and stored in Repo.tokenCount"
               - "Repos exceeding 600k tokens marked as failed with reason"
               - "UI shows warning for oversized repos"
-            implementation:
-              files:
-                - "lib/ingestion/token-count.ts"
-              dependencies: []
-              notes: |
-                Per D10: 600k threshold = 75% of 800k usable limit.
-                Safety buffer accounts for token estimation variance across languages.
-                Formula: sum(file content lengths) × 0.25 tokens/char
-                
-                If exceeded: set ingestionStatus='failed' with reason.
-                UI shows "⚠️ Repository too large for analysis"
-
           - id: "task-2.13-repo-files-table"
             title: "Store indexed file paths for evidence autocomplete"
             description: |
@@ -722,15 +457,6 @@ epics:
               - "All indexed file paths stored in repo_files table"
               - "Table updated on re-ingestion"
               - "Fast lookup available for autocomplete"
-            implementation:
-              files:
-                - "lib/db/repo-files.ts"
-              dependencies: []
-              notes: |
-                Per D21: repo_files table enables autocomplete in Evidence Management UI.
-                Schema: repo_id, file_path
-                Create index on (repo_id, file_path) for fast prefix search.
-
           - id: "task-2.14-stale-evidence-detection"
             title: "Mark evidence as stale during re-ingestion"
             description: |
@@ -746,15 +472,6 @@ epics:
               - "Evidence for deleted files marked isStale=true"
               - "staleReason set to 'File deleted'"
               - "Stale evidence visible in UI with warning"
-            implementation:
-              files:
-                - "lib/ingestion/staleness-check.ts"
-              dependencies: []
-              notes: |
-                Per D21: Staleness detection during re-ingestion.
-                Compare pattern_evidence.filePath against current repo_files.
-                Set isStale=true, staleReason='File deleted' for missing paths.
-
   # ============================================
   # EPIC 3: EXTRACTION
   # ============================================
@@ -793,23 +510,6 @@ epics:
               - "Clear definition of pattern types to extract"
               - "Prompt structure designed for consistent output"
               - "Output schema defined (JSON with name, description, evidence, type)"
-            implementation:
-              files:
-                - "lib/extraction/prompts/extraction.ts"
-                - "lib/extraction/schema.ts"
-              dependencies: []
-              notes: |
-                Per D13: Pattern = abstract definition + evidence pointers.
-                Pattern types per 2.4: structural, behavioral, api, testing, naming, 
-                dependency, file-naming, file-structure, other.
-                
-                Prompt should request:
-                - Pattern name and description
-                - Type classification (with suggestedType for 'other')
-                - Evidence file paths with line ranges
-                - Consistency assessment (D20: high/medium/low)
-                - Code category per evidence file (D25: core/feature/etc.)
-
           - id: "task-3.2-extraction-pipeline"
             title: "Implement LLM extraction pipeline with Claude Sonnet 4.5"
             description: |
@@ -826,19 +526,6 @@ epics:
               - "Uses 1M context beta header"
               - "Response parsed into structured pattern candidates"
               - "Error handling for API failures and rate limits"
-            implementation:
-              files:
-                - "lib/extraction/extract.ts"
-                - "lib/anthropic/client.ts"
-              dependencies:
-                - "@anthropic-ai/sdk"
-              notes: |
-                Per D8: Use claude-sonnet-4-5-20250929 for all LLM tasks.
-                Per D10: Use anthropic-beta: context-1m-2025-08-07 header.
-                
-                Cost estimate: ~$0.50-1.00 per repo extraction (50-200 files).
-                Handle 429 rate limits with exponential backoff.
-
           - id: "task-3.3-pattern-schema"
             title: "Define pattern schema and evidence structure"
             description: |
@@ -852,16 +539,6 @@ epics:
             acceptance_criteria:
               - "TypeScript types match database schema"
               - "Validation functions for pattern data"
-            implementation:
-              files:
-                - "lib/types/pattern.ts"
-                - "lib/types/evidence.ts"
-              dependencies:
-                - "zod"
-              notes: |
-                Use Zod for runtime validation of LLM output.
-                Types should match Section 2.4 interfaces exactly.
-
           - id: "task-3.4-extract-job"
             title: "Create Trigger.dev extractPatterns job"
             description: |
@@ -878,22 +555,6 @@ epics:
               - "Validates tokenCount < 600k before proceeding"
               - "Updates extractionStatus through pending → extracting → extracted/failed"
               - "Errors captured in Repo.lastError"
-            implementation:
-              files:
-                - "jobs/extract-patterns.ts"
-              dependencies:
-                - "@trigger.dev/sdk"
-              notes: |
-                Per D10: Fail gracefully if token count exceeded.
-                Job orchestrates:
-                1. Validate token count
-                2. Run code pattern extraction
-                3. Run filesystem pattern extraction (task 3.17)
-                4. Compute confidence (task 3.10)
-                5. Run health signals (task 3.9)
-                6. Run similarity detection (task 3.15)
-                7. Run backtest (will be triggered after validation setup)
-
           - id: "task-3.5-pattern-dedup"
             title: "Deduplicate and merge similar patterns"
             description: |
@@ -908,15 +569,6 @@ epics:
               - "Similar patterns merged during extraction"
               - "Evidence from merged patterns combined"
               - "Deduplication logged for observability"
-            implementation:
-              files:
-                - "lib/extraction/dedupe.ts"
-              dependencies: []
-              notes: |
-                Use LLM or text similarity heuristics.
-                Prefer LLM judgment for semantic similarity.
-                Merged patterns should combine all evidence.
-
           - id: "task-3.6-store-candidates"
             title: "Store candidate patterns in database"
             description: |
@@ -931,15 +583,6 @@ epics:
               - "Patterns stored with status='candidate'"
               - "Evidence stored in pattern_evidence table"
               - "extractedAt and extractedByModel populated"
-            implementation:
-              files:
-                - "lib/db/patterns.ts"
-              dependencies: []
-              notes: |
-                Set extractedByModel to 'claude-sonnet-4-5-20250929'.
-                Store extractionReasoning from LLM output.
-                Link evidence with isCanonical=false initially.
-
       - id: "story-confidence-scoring"
         title: "Multi-dimensional confidence scoring system"
         description: |
@@ -968,22 +611,6 @@ epics:
               - "Adoption: uniqueAuthors from git blame data"
               - "Establishment: ageCategory from commit dates"
               - "Location: codeCategory per evidence file (LLM-classified)"
-            implementation:
-              files:
-                - "lib/extraction/confidence/dimensions.ts"
-                - "lib/extraction/confidence/evidence.ts"
-                - "lib/extraction/confidence/adoption.ts"
-                - "lib/extraction/confidence/establishment.ts"
-                - "lib/extraction/confidence/location.ts"
-              dependencies: []
-              notes: |
-                Per D25: Location is LLM-classified based on code content, not path.
-                Categories: core, feature, frontend, backend, test, config, helper.
-                Validate codeCategory is one of 7 known values; default to 'helper'.
-                
-                Adoption uses git blame author data from task 2.8.
-                Establishment uses commit dates to determine age category.
-
           - id: "task-3.8-consistency-assessment"
             title: "Request consistency assessment in extraction prompt"
             description: |
@@ -998,18 +625,6 @@ epics:
               - "Extraction prompt includes consistency rubric"
               - "LLM returns consistency level (high/medium/low)"
               - "consistencyNote captured for UI display"
-            implementation:
-              files:
-                - "lib/extraction/prompts/consistency.ts"
-              dependencies: []
-              notes: |
-                Per D20: Consistency rubric in prompt:
-                - high: Nearly identical implementations
-                - medium: Same structure, notable variations
-                - low: Same goal, different approaches
-                
-                Include consistencyNote in response for UI display.
-
           - id: "task-3.9-health-signals"
             title: "Run health signals prompt per pattern"
             description: |
@@ -1024,22 +639,6 @@ epics:
               - "Health signals prompt covers all 5 categories"
               - "Results stored in Pattern.healthSignals JSONB"
               - "hasWarnings flag set for quick filtering"
-            implementation:
-              files:
-                - "lib/extraction/health-signals.ts"
-                - "lib/extraction/prompts/health-signals.ts"
-              dependencies: []
-              notes: |
-                Per D23: Single prompt per pattern covering:
-                1. error-handling: Missing try/catch, .catch(), error boundaries
-                2. deprecated-api: Two-step (identify libs, flag deprecated)
-                3. consistency: Mixed approaches detected
-                4. security: High-confidence obvious issues only
-                5. completeness: Missing null checks, validation
-                
-                Cost: ~$0.01-0.02 per pattern.
-                Security examples are language-agnostic per D23.
-
           - id: "task-3.10-confidence-tier"
             title: "Derive confidence tier from dimensions"
             description: |
@@ -1055,20 +654,6 @@ epics:
               - "Tier derived according to D11 definitions"
               - "Full PatternConfidence stored in confidenceScore JSONB"
               - "Weak tier logic handles single author correctly"
-            implementation:
-              files:
-                - "lib/extraction/confidence/tier.ts"
-              dependencies: []
-              notes: |
-                Tier definitions from D11:
-                - strong: 5+ instances, 3+ authors, established, high/medium consistency
-                - emerging: 3+ instances, <3 months old, spreading
-                - moderate: Meets some but not all strong criteria
-                - weak: 2 instances, OR single author with ≤5 instances, OR low consistency
-                - legacy: Stagnant (no changes >1yr)
-                
-                Per audit: singleAuthorMaxInstances=5 (not automatic weak for established patterns).
-
           - id: "task-3.11-insight-generation"
             title: "Implement insight generation with json-rules-engine"
             description: |
@@ -1083,22 +668,6 @@ epics:
               - "json-rules-engine installed and configured"
               - "15 starter rules implemented"
               - "Highest-priority matching insight returned per pattern"
-            implementation:
-              files:
-                - "lib/extraction/insights/engine.ts"
-                - "lib/extraction/insights/rules.ts"
-                - "lib/extraction/insights/facts.ts"
-              dependencies:
-                - "json-rules-engine"
-              notes: |
-                Per D24: 15 rules priority-ordered.
-                Facts derived from pattern: tier, instanceCount, uniqueAuthors,
-                consistency, ageCategory, primaryLocation, isSpreading, isStagnant,
-                isSingleAuthor, hasHealthWarnings, backtestViolations.
-                
-                Store insight and suggestedActions in PatternConfidence.
-                Rules hardcoded for MVP; move to DB post-MVP.
-
       - id: "story-filesystem-extraction"
         title: "Filesystem pattern extraction"
         description: |
@@ -1124,16 +693,6 @@ epics:
               - "Directory structure extracted with depth"
               - "File names grouped by pattern"
               - "Path patterns identified"
-            implementation:
-              files:
-                - "lib/extraction/filesystem/tree-analysis.ts"
-              dependencies: []
-              notes: |
-                Analyze file tree for:
-                - Naming conventions (use*.ts, *.test.ts, etc.)
-                - Directory structures (components/[name]/index.ts)
-                - Co-location patterns
-
           - id: "task-3.17-filesystem-prompt"
             title: "Filesystem pattern extraction prompt"
             description: |
@@ -1148,20 +707,6 @@ epics:
               - "Prompt identifies file-naming patterns with glob patterns"
               - "Prompt identifies file-structure patterns with example paths"
               - "Anti-pattern examples extracted for context files"
-            implementation:
-              files:
-                - "lib/extraction/prompts/filesystem.ts"
-              dependencies: []
-              notes: |
-                Per D31: file-naming and file-structure only for MVP.
-                Boundaries pattern type deferred.
-                
-                Output should include:
-                - Pattern name and description
-                - globPattern for file-naming (e.g., "src/hooks/use*.ts")
-                - Example paths as evidence
-                - antiPatternExamples for context files
-
           - id: "task-3.18-filesystem-evidence"
             title: "Store FilesystemPatternEvidence"
             description: |
@@ -1176,15 +721,6 @@ epics:
               - "FilesystemPatternEvidence records created per path"
               - "globPattern stored on Pattern for enforcement"
               - "antiPatternExamples stored on Pattern for context files"
-            implementation:
-              files:
-                - "lib/db/filesystem-patterns.ts"
-              dependencies: []
-              notes: |
-                Per updated D31: One row per path (like PatternEvidence).
-                globPattern and antiPatternExamples on Pattern, not evidence.
-                isDirectory flag distinguishes file vs directory evidence.
-
           - id: "task-3.19-filesystem-confidence"
             title: "2-dimension confidence for filesystem patterns"
             description: |
@@ -1199,15 +735,6 @@ epics:
               - "Evidence dimension: path count demonstrating pattern"
               - "Adoption dimension: % of matching paths following convention"
               - "confidenceModel='filesystem' set on pattern"
-            implementation:
-              files:
-                - "lib/extraction/confidence/filesystem.ts"
-              dependencies: []
-              notes: |
-                Per D34: Filesystem patterns use 2-dimension model.
-                No Establishment or Location dimensions.
-                Store in FilesystemPatternConfidence format.
-
       - id: "story-violation-module"
         title: "Shared violation detection module"
         description: |
@@ -1234,16 +761,6 @@ epics:
               - "Patterns listed with name, type, tier badge"
               - "Sortable by tier and extraction date"
               - "Clickable to view details"
-            implementation:
-              files:
-                - "app/repos/[id]/patterns/page.tsx"
-                - "components/patterns/pattern-list.tsx"
-                - "components/patterns/tier-badge.tsx"
-              dependencies: []
-              notes: |
-                Basic list view; full validation UI in Phase 4.
-                Show tier badge (strong/emerging/moderate/weak/legacy).
-
           - id: "task-3.13-violation-module"
             title: "Build violation detection module (pattern + diff → violations)"
             description: |
@@ -1259,18 +776,6 @@ epics:
               - "Accepts pattern definition and diff content"
               - "Returns list of violations with file, line, description"
               - "Handles both code and file-naming patterns"
-            implementation:
-              files:
-                - "lib/enforcement/detect-violations.ts"
-                - "lib/enforcement/prompts/violation-check.ts"
-              dependencies: []
-              notes: |
-                Uses LLM to analyze diff against pattern.
-                Cost: ~$0.10-0.30 per PR analysis.
-                
-                For code patterns: analyze semantic violations.
-                For file-naming: regex match on new file paths.
-
           - id: "task-3.14-extraction-progress"
             title: "Add extraction progress to Repo with Realtime events"
             description: |
@@ -1285,13 +790,6 @@ epics:
               - "extractionStatus updated: pending → extracting → extracted/failed"
               - "Supabase Realtime events emitted on status change"
               - "UI can subscribe for live updates"
-            implementation:
-              files:
-                - "lib/db/repos.ts"
-              dependencies: []
-              notes: |
-                Uses same Realtime subscription pattern as ingestion progress.
-
           - id: "task-spike-time-to-value"
             title: "Validate <15min time-to-value is achievable"
             description: |
@@ -1308,21 +806,6 @@ epics:
               - "Bottlenecks identified if >15min"
               - "Optimization recommendations documented if threshold exceeded"
               - "Go/no-go decision on current architecture documented"
-            implementation:
-              files:
-                - "docs/time-to-value-analysis.md"
-              dependencies: []
-              notes: |
-                Per Q2 and H9: Critical validation point for product viability.
-                Measure end-to-end: connect → ingest → extract → first pattern visible.
-                
-                If slow, consider:
-                - Static analysis fallback for immediate patterns
-                - Progressive disclosure (show file tree while extracting)
-                - Parallel ingestion and extraction where possible
-                
-                Kill threshold per R4: if >30min with no clear optimization path.
-
           - id: "task-3.15-similarity-detection"
             title: "Duplicate detection for candidates vs authoritative patterns"
             description: |
@@ -1338,15 +821,6 @@ epics:
               - "Candidates compared against existing authoritative patterns"
               - "Similar patterns flagged with similarToPatternId"
               - "Bundled with health signals prompt for efficiency"
-            implementation:
-              files:
-                - "lib/extraction/similarity.ts"
-              dependencies: []
-              notes: |
-                Per D29: Bundle with health signals prompt.
-                Ask LLM: "Is this pattern semantically similar to any of [list]?"
-                If match: set similarToPatternId on candidate.
-
   # ============================================
   # EPIC 4: VALIDATION
   # ============================================
@@ -1386,19 +860,6 @@ epics:
               - "Tier badge with color coding"
               - "Health warnings with category icons"
               - "Contextual insight text and suggested actions"
-            implementation:
-              files:
-                - "components/patterns/confidence-card.tsx"
-                - "components/patterns/dimension-bar.tsx"
-                - "components/patterns/health-warnings.tsx"
-                - "components/patterns/insight-panel.tsx"
-              dependencies: []
-              notes: |
-                Per D13: Progressive disclosure.
-                Card shows: tier, stats, backtest, description.
-                Expand for: confidence dimensions, health signals, evidence list.
-                80% of decisions from card alone.
-
           - id: "task-4.2-insight-display"
             title: "Display contextual insight and suggested actions"
             description: |
@@ -1412,14 +873,6 @@ epics:
             acceptance_criteria:
               - "Insight text displayed prominently on card"
               - "Suggested actions shown as clickable buttons"
-            implementation:
-              files:
-                - "components/patterns/insight-display.tsx"
-              dependencies: []
-              notes: |
-                Suggested actions from rules engine: Promote, Reject, Defer.
-                Style primary action based on insight recommendation.
-
           - id: "task-4.8-pattern-dashboard"
             title: "Build pattern dashboard with filtering and sorting"
             description: |
@@ -1434,17 +887,6 @@ epics:
               - "Filter by status (candidate, authoritative, rejected, deferred)"
               - "Filter by tier, repo, type"
               - "Sort by confidence score and extraction date"
-            implementation:
-              files:
-                - "app/patterns/page.tsx"
-                - "components/patterns/filter-bar.tsx"
-                - "components/patterns/pattern-grid.tsx"
-              dependencies: []
-              notes: |
-                Per D17: Queue sorting algorithm.
-                tierWeight * 10000 + backtestViolations for score.
-                Secondary sort by extractedAt.
-
           - id: "task-4.11-queue-ux"
             title: "Implement keyboard-driven triage queue"
             description: |
@@ -1460,18 +902,6 @@ epics:
               - "p for Promote, r for Reject, d for Defer"
               - "Progress bar showing queue completion"
               - "Deferred patterns in separate section"
-            implementation:
-              files:
-                - "app/patterns/triage/page.tsx"
-                - "components/patterns/triage-queue.tsx"
-                - "hooks/use-keyboard-navigation.ts"
-              dependencies: []
-              notes: |
-                Per D13: Keyboard-first linear queue.
-                Per D17: Sorting algorithm for queue order.
-                Deferred patterns sorted by deferredAt ascending.
-                Show filter options: Status, Tier, Type, Stuck badge.
-
           - id: "task-4.15-filesystem-card"
             title: "Filesystem pattern card UI with 2 confidence pills"
             description: |
@@ -1486,13 +916,6 @@ epics:
               - "2 confidence pills (Evidence, Adoption) for filesystem patterns"
               - "Path examples and glob pattern displayed"
               - "Type badge distinguishes file-naming vs file-structure"
-            implementation:
-              files:
-                - "components/patterns/filesystem-card.tsx"
-              dependencies: []
-              notes: |
-                Per D34: Different pattern types have different scoring.
-
       - id: "story-validation-actions"
         title: "Validation actions (Promote, Reject, Defer)"
         description: |
@@ -1518,19 +941,6 @@ epics:
               - "Promote opens modal with configuration options"
               - "Reject opens modal with optional reason"
               - "Defer is instant, increments deferCount"
-            implementation:
-              files:
-                - "components/patterns/actions/promote-modal.tsx"
-                - "components/patterns/actions/reject-modal.tsx"
-                - "lib/db/patterns.ts"
-              dependencies: []
-              notes: |
-                Per D18: Rejection is optional reason modal.
-                Fast path: press r, hit Enter → rejected.
-                
-                Per D19: Severity dropdown in promote modal.
-                Default: 'warning' (doesn't block merges).
-
           - id: "task-4.4-promote-action"
             title: "Implement Promote action with ownership and severity"
             description: |
@@ -1546,15 +956,6 @@ epics:
               - "ownerId and validatedBy set to current user"
               - "defaultSeverity set from modal selection"
               - "statusChangedAt timestamp captured"
-            implementation:
-              files:
-                - "lib/db/patterns.ts"
-                - "app/api/patterns/[id]/promote/route.ts"
-              dependencies: []
-              notes: |
-                Per D22: Validator becomes owner on promote for MVP.
-                Per D19: Default severity is 'warning'.
-
           - id: "task-4.5-rationale-field"
             title: "Add rationale field (the 'Why') on promote"
             description: |
@@ -1569,15 +970,6 @@ epics:
               - "Rationale text field in promote modal"
               - "Optional but encouraged"
               - "Stored in Pattern.rationale"
-            implementation:
-              files:
-                - "components/patterns/actions/promote-modal.tsx"
-              dependencies: []
-              notes: |
-                Per D3: Provenance as primary moat.
-                Rationale is the "Why" that makes pattern valuable.
-                Show in PR comments for violation attribution.
-
           - id: "task-4.6-provenance-linking"
             title: "Add provenance linking with URL input"
             description: |
@@ -1592,16 +984,6 @@ epics:
               - "URL input field in promote modal"
               - "Type selection (PR, doc, Slack, etc.)"
               - "Provenance records created and linked to pattern"
-            implementation:
-              files:
-                - "components/patterns/actions/provenance-input.tsx"
-                - "lib/db/provenance.ts"
-              dependencies: []
-              notes: |
-                Per D3: Provenance is the moat.
-                Support multiple provenance links per pattern.
-                Auto-detect type from URL if possible.
-
           - id: "task-4.16-enforcement-toggles"
             title: "Enforcement channel toggles in promotion modal"
             description: |
@@ -1616,15 +998,6 @@ epics:
               - "PR Review checkbox (default: true for code/file-naming)"
               - "AI Agents checkbox (default: true)"
               - "Severity dropdown for each enabled channel"
-            implementation:
-              files:
-                - "components/patterns/actions/enforcement-toggles.tsx"
-              dependencies: []
-              notes: |
-                Per D30: Dual channel enforcement.
-                enforcement: { prReview: boolean, aiContext: boolean }
-                File-structure patterns: prReview disabled (task 4.17).
-
           - id: "task-4.17-disable-structure-pr"
             title: "Disable PR enforcement for file-structure patterns"
             description: |
@@ -1638,14 +1011,6 @@ epics:
             acceptance_criteria:
               - "PR Review checkbox disabled for file-structure patterns"
               - "Tooltip: 'PR enforcement not available for structure patterns'"
-            implementation:
-              files:
-                - "components/patterns/actions/enforcement-toggles.tsx"
-              dependencies: []
-              notes: |
-                Per D35: File-structure is context-file-only.
-                PR enforcement is ambiguous for incomplete structures.
-
       - id: "story-pattern-detail"
         title: "Pattern detail view and evidence management"
         description: |
@@ -1673,18 +1038,6 @@ epics:
               - "Evidence list with GitHub links"
               - "Provenance links displayed"
               - "Edit buttons for authoritative patterns"
-            implementation:
-              files:
-                - "app/patterns/[id]/page.tsx"
-                - "components/patterns/pattern-header.tsx"
-                - "components/patterns/evidence-list.tsx"
-                - "components/patterns/provenance-list.tsx"
-              dependencies: []
-              notes: |
-                Per D13: Pattern detail view needs edit capabilities.
-                GitHub links use capturedAtSha for stable URLs.
-                Show canonical example prominently.
-
           - id: "task-4.13-evidence-management"
             title: "Build evidence management UI with autocomplete"
             description: |
@@ -1702,17 +1055,6 @@ epics:
               - "Set/change canonical example"
               - "Remove evidence with confirmation for canonical"
               - "Stale evidence shown with warning badge"
-            implementation:
-              files:
-                - "components/patterns/evidence-modal.tsx"
-                - "components/patterns/file-autocomplete.tsx"
-                - "app/api/patterns/[id]/evidence/route.ts"
-              dependencies: []
-              notes: |
-                Per D21: Evidence management with staleness detection.
-                Capture HEAD SHA on add (capturedAtSha).
-                Display stale evidence with ⚠️ and reason.
-
       - id: "story-backtest"
         title: "Backtest and impact preview"
         description: |
@@ -1739,18 +1081,6 @@ epics:
               - "Summary stored in Pattern.backtestSummary"
               - "Individual violations stored in backtest_violations table"
               - "CASCADE delete cleans up on pattern deletion"
-            implementation:
-              files:
-                - "lib/backtest/run-backtest.ts"
-                - "lib/db/backtest-violations.ts"
-              dependencies: []
-              notes: |
-                Per D28: Diffs read from Supabase Storage.
-                Per D12: Two-part storage - summary on Pattern, details in table.
-                
-                Run after extraction completes or on demand.
-                Cost: LLM call per pattern × relevant PRs.
-
           - id: "task-4.10-impact-preview"
             title: "Display impact preview in validation UI"
             description: |
@@ -1765,14 +1095,6 @@ epics:
               - "Backtest results shown on pattern card"
               - "Violation count and PR count displayed"
               - "Click through to view details"
-            implementation:
-              files:
-                - "components/patterns/backtest-preview.tsx"
-              dependencies: []
-              notes: |
-                Per D12: Impact preview makes action feel consequential.
-                "Would have caught 5 violations in 3 PRs"
-
           - id: "task-4.10a-backtest-detail"
             title: "Build 'View all violations' modal for backtest results"
             description: |
@@ -1787,14 +1109,6 @@ epics:
               - "List all backtest violations for a pattern"
               - "Links to original PRs"
               - "File and line information displayed"
-            implementation:
-              files:
-                - "components/patterns/backtest-detail-modal.tsx"
-              dependencies: []
-              notes: |
-                Shows full detail of what would have been caught.
-                Helps users understand pattern value before promoting.
-
       - id: "story-merge-and-progress"
         title: "Merge action and real-time progress"
         description: |
@@ -1820,16 +1134,6 @@ epics:
               - "Subscribe to patterns INSERT events"
               - "Animate pattern list as extraction completes"
               - "Unsubscribe on unmount"
-            implementation:
-              files:
-                - "app/repos/[id]/progress/page.tsx"
-                - "hooks/use-extraction-progress.ts"
-              dependencies: []
-              notes: |
-                Per D16: Batch completion (not streaming patterns).
-                Show spinner during extraction, patterns appear on completion.
-                Supabase Realtime for live status updates.
-
           - id: "task-4.14-merge-action"
             title: "Implement merge action for duplicate candidates"
             description: |
@@ -1845,16 +1149,6 @@ epics:
               - "Merge action copies evidence to target pattern"
               - "Candidate deleted (cascades backtest_violations)"
               - "Success toast with evidence count"
-            implementation:
-              files:
-                - "components/patterns/duplicate-card.tsx"
-                - "app/api/patterns/[id]/merge/route.ts"
-              dependencies: []
-              notes: |
-                Per D29: One-click evidence capture.
-                No modal — instant action like Defer.
-                Keyboard shortcut: 'm' for merge.
-
   # ============================================
   # EPIC 5a: CONTEXT FILES
   # ============================================
@@ -1892,15 +1186,6 @@ epics:
               - "ContextFileConfig table created"
               - "CRUD API for config"
               - "Default configs created on repo connection"
-            implementation:
-              files:
-                - "lib/db/context-configs.ts"
-                - "app/api/repos/[id]/context-config/route.ts"
-              dependencies: []
-              notes: |
-                Per D32: Claude + Cursor formats for MVP.
-                Default paths: CLAUDE.md, .cursorrules
-
           - id: "task-5a.2-context-setup-ui"
             title: "Context file setup UI (Workflow 9)"
             description: |
@@ -1915,15 +1200,6 @@ epics:
               - "Format selection (Claude, Cursor)"
               - "Path customization"
               - "Sync toggle"
-            implementation:
-              files:
-                - "app/repos/[id]/context/setup/page.tsx"
-                - "components/context/format-selector.tsx"
-              dependencies: []
-              notes: |
-                Default both formats to enabled.
-                Show preview of generated content.
-
           - id: "task-5a.3-pattern-transformer"
             title: "Pattern → markdown transformer (base)"
             description: |
@@ -1938,15 +1214,6 @@ epics:
               - "Patterns with aiContext=true included"
               - "Structured markdown with pattern name, description, rationale"
               - "Evidence references included"
-            implementation:
-              files:
-                - "lib/context-files/transform.ts"
-              dependencies: []
-              notes: |
-                Per D30: Only patterns with enforcement.aiContext=true.
-                Group by pattern type.
-                Include canonical example if available.
-
           - id: "task-5a.4-format-adapters"
             title: "Format adapters for Claude and Cursor"
             description: |
@@ -1961,16 +1228,6 @@ epics:
               - "Claude format: CLAUDE.md structure"
               - "Cursor format: .cursorrules structure"
               - "Tool-specific conventions respected"
-            implementation:
-              files:
-                - "lib/context-files/adapters/claude.ts"
-                - "lib/context-files/adapters/cursor.ts"
-              dependencies: []
-              notes: |
-                Per D32: Each tool has specific conventions.
-                Claude: markdown with sections.
-                Cursor: rules format with clear directives.
-
           - id: "task-5a.5-filesystem-transformer"
             title: "Filesystem pattern → markdown transformer"
             description: |
@@ -1985,14 +1242,6 @@ epics:
               - "Filesystem patterns in dedicated section"
               - "Glob patterns shown for file-naming"
               - "Directory structure examples for file-structure"
-            implementation:
-              files:
-                - "lib/context-files/filesystem-transform.ts"
-              dependencies: []
-              notes: |
-                Per D31: Filesystem patterns valuable for AI context.
-                Show anti-pattern examples where available.
-
           - id: "task-5a.6-marker-append"
             title: "Marker-based file append logic"
             description: |
@@ -2008,15 +1257,6 @@ epics:
               - "User content outside markers preserved"
               - "New files created with just managed section"
               - "Existing files without markers: append at end"
-            implementation:
-              files:
-                - "lib/context-files/marker-append.ts"
-              dependencies: []
-              notes: |
-                Per D33: Marker-based append.
-                Never touch content outside markers.
-                Clear warning in markers: "Do not edit below"
-
           - id: "task-5a.7-debounced-sync"
             title: "Debounced sync trigger on pattern changes"
             description: |
@@ -2031,16 +1271,6 @@ epics:
               - "Pattern changes queue regeneration"
               - "5-10s debounce window"
               - "Batch multiple changes into single regeneration"
-            implementation:
-              files:
-                - "jobs/sync-context-files.ts"
-              dependencies:
-                - "@trigger.dev/sdk"
-              notes: |
-                Per D36: Debounced regeneration.
-                Use Trigger.dev scheduled/delayed task.
-                Reset timer on new changes during window.
-
           - id: "task-5a.8-download-ui"
             title: "Manual download/copy UI for context files"
             description: |
@@ -2055,14 +1285,6 @@ epics:
               - "Download generated file"
               - "Copy to clipboard"
               - "Preview in modal"
-            implementation:
-              files:
-                - "components/context/download-modal.tsx"
-              dependencies: []
-              notes: |
-                For users who want manual control.
-                Show generated content in preview.
-
           - id: "task-5a.9-sync-dashboard"
             title: "AI Agent Sync dashboard widget (Workflow 10)"
             description: |
@@ -2078,14 +1300,6 @@ epics:
               - "Last updated timestamp"
               - "Pattern counts per format"
               - "Manual regenerate button"
-            implementation:
-              files:
-                - "components/dashboard/context-sync-widget.tsx"
-              dependencies: []
-              notes: |
-                Per Workflow 10: Sync status visibility.
-                Show which patterns are included.
-
   # ============================================
   # EPIC 5b: PR ENFORCEMENT
   # ============================================
@@ -2123,17 +1337,6 @@ epics:
               - "Signature verified using @octokit/webhooks-methods"
               - "401 returned for invalid signatures"
               - "Rejected webhooks logged for security monitoring"
-            implementation:
-              files:
-                - "app/api/github/webhook/route.ts"
-                - "lib/github/webhook-verify.ts"
-              dependencies:
-                - "@octokit/webhooks-methods"
-              notes: |
-                Use GITHUB_WEBHOOK_SECRET env var.
-                Verify X-Hub-Signature-256 header.
-                Log rejected requests for security audit.
-
           - id: "task-5b.2-fetch-diff"
             title: "Fetch PR diff on webhook event"
             description: |
@@ -2147,15 +1350,6 @@ epics:
             acceptance_criteria:
               - "Diff fetched from GitHub API"
               - "Full diff content available for analysis"
-            implementation:
-              files:
-                - "lib/github/diff.ts"
-              dependencies: []
-              notes: |
-                Use GET /repos/{owner}/{repo}/pulls/{number}/files
-                Or fetch .diff file directly.
-                Live PRs always fetch fresh (not from storage).
-
           - id: "task-5b.3-code-violation"
             title: "Build code pattern violation detection for PRs"
             description: |
@@ -2170,14 +1364,6 @@ epics:
               - "Only patterns with enforcement.prReview=true checked"
               - "Uses shared violation detection module"
               - "Returns violations with file, line, description"
-            implementation:
-              files:
-                - "lib/enforcement/pr-analysis.ts"
-              dependencies: []
-              notes: |
-                Per D30: Only check prReview-enabled patterns.
-                Reuses task 3.13 violation module.
-
           - id: "task-5b.4-file-naming-violation"
             title: "File naming violation detection via regex"
             description: |
@@ -2192,16 +1378,6 @@ epics:
               - "New files checked against file-naming globs"
               - "Only patterns with enforcement.prReview=true"
               - "Violations created for non-matching files"
-            implementation:
-              files:
-                - "lib/enforcement/file-naming.ts"
-              dependencies:
-                - "minimatch"
-              notes: |
-                Per D35: File-naming can be enforced in PRs.
-                Use glob pattern from Pattern.globPattern.
-                Simple regex/glob match, no LLM needed.
-
           - id: "task-5b.7-analyze-job"
             title: "Create Trigger.dev analyzePR job"
             description: |
@@ -2216,21 +1392,6 @@ epics:
               - "Job triggered on webhook"
               - "Updates analysisStatus through pending → analyzing → analyzed/failed"
               - "Errors captured in PullRequest.lastError"
-            implementation:
-              files:
-                - "jobs/analyze-pr.ts"
-              dependencies:
-                - "@trigger.dev/sdk"
-              notes: |
-                Job orchestrates:
-                1. Fetch diff
-                2. Run code violation detection
-                3. Run file-naming detection
-                4. Check evolution (task 5b.5)
-                5. Store violations
-                6. Post comments
-                7. Update status check
-
           - id: "task-5b.8-store-violations"
             title: "Store violations with idempotency"
             description: |
@@ -2245,15 +1406,6 @@ epics:
               - "Violations stored with PR and pattern references"
               - "Severity inherited from pattern.defaultSeverity"
               - "Idempotent: check existing before insert"
-            implementation:
-              files:
-                - "lib/db/violations.ts"
-              dependencies: []
-              notes: |
-                Per D19: severity from pattern.defaultSeverity.
-                Check existing (pullRequestId, patternId, filePath, startLine).
-                GitHub may retry webhooks on 5xx.
-
       - id: "story-pr-comments"
         title: "PR comments and status checks"
         description: |
@@ -2281,16 +1433,6 @@ epics:
               - "Owner attribution: 'Maintained by @username'"
               - "Rationale snippet included"
               - "Dismiss link to app"
-            implementation:
-              files:
-                - "lib/github/comments.ts"
-                - "lib/enforcement/comment-template.ts"
-              dependencies: []
-              notes: |
-                Per D12: Violation attribution creates engagement.
-                URL format: /violations/{id}?action=dismiss
-                Include pattern link, violation link, canonical example link.
-
           - id: "task-5b.10-evolution-comments"
             title: "Post pattern evolution PR comments"
             description: |
@@ -2306,15 +1448,6 @@ epics:
               - "Different format for canonical vs non-canonical"
               - "Diff summary included"
               - "Review link to app"
-            implementation:
-              files:
-                - "lib/enforcement/evolution-comment.ts"
-              dependencies: []
-              notes: |
-                Per D27: Pattern owner notified at moment of change.
-                Include diff summary from task 5b.6.
-                Link to evolution review page.
-
           - id: "task-5b.11-status-check"
             title: "Post GitHub status check based on violations"
             description: |
@@ -2330,15 +1463,6 @@ epics:
               - "Any error → failure"
               - "Warning only → success"
               - "None → success"
-            implementation:
-              files:
-                - "lib/github/status-check.ts"
-              dependencies: []
-              notes: |
-                Use GitHub Commit Status API.
-                Auto-enabled when repo has patterns with prReview=true.
-                Single status check with state priority.
-
           - id: "task-5b.12-evolution-status"
             title: "Status check for pending evolution reviews"
             description: |
@@ -2353,14 +1477,6 @@ epics:
               - "Canonical modified → pending state"
               - "Description: 'Awaiting review: canonical example modified'"
               - "Non-canonical → success with note"
-            implementation:
-              files:
-                - "lib/github/status-check.ts"
-              dependencies: []
-              notes: |
-                Per D27: Canonical modifications require approval.
-                Blocks merge until pattern owner accepts/rejects.
-
           - id: "task-5b.13-pr-history-ui"
             title: "Build PR analysis history UI"
             description: |
@@ -2375,15 +1491,6 @@ epics:
               - "List of analyzed PRs with status"
               - "Violation count per PR"
               - "Click through to PR details"
-            implementation:
-              files:
-                - "app/repos/[id]/prs/page.tsx"
-                - "components/prs/pr-list.tsx"
-              dependencies: []
-              notes: |
-                Shows enforcement activity.
-                Link to GitHub PR.
-
       - id: "story-evolution-workflow"
         title: "Pattern evolution detection and review"
         description: |
@@ -2409,16 +1516,6 @@ epics:
               - "Changed files compared against evidence paths"
               - "PatternEvolutionRequest created for matches"
               - "isCanonical flag set appropriately"
-            implementation:
-              files:
-                - "lib/enforcement/evolution-detect.ts"
-                - "lib/db/pattern-evolution.ts"
-              dependencies: []
-              notes: |
-                Per D27: Detect evidence modifications.
-                Compare changed files against pattern_evidence.filePath.
-                Flag canonical modifications as high priority.
-
           - id: "task-5b.6-diff-summary"
             title: "Generate diff summary for evolution requests"
             description: |
@@ -2432,14 +1529,6 @@ epics:
             acceptance_criteria:
               - "LLM generates concise diff summary"
               - "Stored in PatternEvolutionRequest"
-            implementation:
-              files:
-                - "lib/enforcement/diff-summary.ts"
-              dependencies: []
-              notes: |
-                "What changed in this evidence file?"
-                Concise summary for PR comment and review page.
-
           - id: "task-5b.14-violation-detail"
             title: "Build violation detail page with dismiss action"
             description: |
@@ -2456,16 +1545,6 @@ epics:
               - "False positive checkbox"
               - "Auth required"
               - "Supports ?action= query param for deep linking"
-            implementation:
-              files:
-                - "app/violations/[id]/page.tsx"
-                - "components/violations/dismiss-modal.tsx"
-              dependencies: []
-              notes: |
-                Per D26: Single dismiss action with optional FP flag.
-                Auth required — link from PR comment.
-                Support returnTo URL through auth flow.
-
           - id: "task-5b.15-evolution-review"
             title: "Build pattern evolution review page"
             description: |
@@ -2481,16 +1560,6 @@ epics:
               - "Current pattern definition shown"
               - "Accept: update evidence, optionally update description"
               - "Reject: create violation"
-            implementation:
-              files:
-                - "app/patterns/[id]/evolution/[requestId]/page.tsx"
-                - "components/patterns/evolution-review.tsx"
-              dependencies: []
-              notes: |
-                Per D27: Accept updates capturedAtSha.
-                Line numbers may drift until re-extraction.
-                Optionally update pattern description checkbox.
-
           - id: "task-5b.16-evolution-lifecycle"
             title: "Handle PR merged/closed webhooks for evolution lifecycle"
             description: |
@@ -2505,16 +1574,6 @@ epics:
               - "On PR merge: set pending evolution requests to status='historical', closedAt=now()"
               - "On PR closed without merge: set to status='cancelled', closedAt=now()"
               - "Only affects evolution requests for the specific PR"
-            implementation:
-              files:
-                - "app/api/webhooks/github/route.ts"
-                - "lib/evolution/lifecycle.ts"
-              dependencies: []
-              notes: |
-                Per D27: Evolution request lifecycle tied to PR state.
-                Handle pull_request.closed webhook event.
-                Check merged boolean to distinguish merge vs close.
-
   # ============================================
   # EPIC 6: POLISH
   # ============================================
@@ -2550,14 +1609,6 @@ epics:
             acceptance_criteria:
               - "lastError: string | null on Repo and PullRequest"
               - "Cleared on successful operation"
-            implementation:
-              files:
-                - "supabase/migrations/002_error_fields.sql"
-              dependencies: []
-              notes: |
-                Already in schema per Section 2.4.
-                Ensure populated on all failure paths.
-
           - id: "task-6.1b-extraction-errors"
             title: "Extraction error handling with UI feedback"
             description: |
@@ -2573,15 +1624,6 @@ epics:
               - "extractionStatus set to 'failed'"
               - "lastError populated with message"
               - "UI shows 'Extraction failed' with retry"
-            implementation:
-              files:
-                - "jobs/extract-patterns.ts"
-                - "components/repos/extraction-error.tsx"
-              dependencies: []
-              notes: |
-                Handle Anthropic API errors (429, 500, timeout).
-                Show retry button that re-triggers job.
-
           - id: "task-6.1c-ingestion-errors"
             title: "Ingestion error handling with UI feedback"
             description: |
@@ -2596,14 +1638,6 @@ epics:
               - "GitHub errors caught and logged"
               - "ingestionStatus set to 'failed'"
               - "UI shows 'Ingestion failed' with retry"
-            implementation:
-              files:
-                - "jobs/ingest-repo.ts"
-                - "components/repos/ingestion-error.tsx"
-              dependencies: []
-              notes: |
-                Handle rate limits, auth errors, network issues.
-
           - id: "task-6.1d-pr-analysis-errors"
             title: "PR analysis error handling"
             description: |
@@ -2618,14 +1652,6 @@ epics:
               - "Analysis errors caught"
               - "analysisStatus set to 'failed'"
               - "Status check shows 'Analysis failed — will retry'"
-            implementation:
-              files:
-                - "jobs/analyze-pr.ts"
-              dependencies: []
-              notes: |
-                Queue retry on transient failures.
-                Don't post error comments on PR.
-
           - id: "task-6.1e-github-rate-limits"
             title: "GitHub rate limit handling with backoff"
             description: |
@@ -2640,14 +1666,6 @@ epics:
               - "Check rate limit headers on all GitHub calls"
               - "Back off when <100 remaining"
               - "Exponential backoff on 403 rate limit"
-            implementation:
-              files:
-                - "lib/github/rate-limit.ts"
-              dependencies: []
-              notes: |
-                Integrate with all GitHub API calls.
-                Log rate limit status for monitoring.
-
           - id: "task-6.1f-llm-rate-limits"
             title: "LLM rate limit handling with Trigger.dev retry"
             description: |
@@ -2662,14 +1680,6 @@ epics:
               - "429 responses caught"
               - "Retry queued via Trigger.dev"
               - "Exponential backoff applied"
-            implementation:
-              files:
-                - "lib/anthropic/rate-limit.ts"
-              dependencies: []
-              notes: |
-                Use Trigger.dev retry configuration.
-                Max 3 attempts with increasing delay.
-
           - id: "task-6.2-retry-config"
             title: "Configure Trigger.dev job retry logic"
             description: |
@@ -2684,15 +1694,6 @@ epics:
               - "Max 3 attempts configured"
               - "Exponential backoff between attempts"
               - "Integrates with error handling tasks"
-            implementation:
-              files:
-                - "trigger.config.ts"
-                - "jobs/*.ts"
-              dependencies: []
-              notes: |
-                Trigger.dev has built-in retry configuration.
-                Apply to all job definitions.
-
       - id: "story-ux-polish"
         title: "Loading states, empty states, and UX refinements"
         description: |
@@ -2718,15 +1719,6 @@ epics:
               - "Loading spinner for all data fetching"
               - "Progress indicator during extraction"
               - "Skeleton loaders for content areas"
-            implementation:
-              files:
-                - "components/ui/loading.tsx"
-                - "components/ui/skeleton.tsx"
-              dependencies: []
-              notes: |
-                Consistent loading UI throughout app.
-                Use skeletons for list views.
-
           - id: "task-6.4-empty-states"
             title: "Add empty states for all views"
             description: |
@@ -2742,15 +1734,6 @@ epics:
               - "Empty state for no violations"
               - "Empty state for no repos"
               - "Zero patterns extracted state"
-            implementation:
-              files:
-                - "components/ui/empty-state.tsx"
-              dependencies: []
-              notes: |
-                Include helpful CTAs in empty states.
-                "Connect a repo to get started"
-                "No patterns extracted — try a different repo"
-
           - id: "task-6.6-pattern-editing"
             title: "Enable pattern editing post-validation"
             description: |
@@ -2765,15 +1748,6 @@ epics:
               - "Edit button on pattern detail"
               - "Inline editing for description, rationale"
               - "Save button with confirmation"
-            implementation:
-              files:
-                - "components/patterns/pattern-editor.tsx"
-                - "app/api/patterns/[id]/route.ts"
-              dependencies: []
-              notes: |
-                Only authoritative patterns editable.
-                Track updatedAt timestamp.
-
           - id: "task-6.6a-storage-cleanup"
             title: "Cleanup pr_diffs storage on repo disconnect"
             description: |
@@ -2788,17 +1762,6 @@ epics:
               - "On repo disconnect, delete pr_diffs/{repo_id}/ folder from Supabase Storage"
               - "Handle storage deletion errors gracefully"
               - "Log cleanup operations for auditing"
-            implementation:
-              files:
-                - "lib/storage/cleanup.ts"
-                - "app/api/repos/[id]/disconnect/route.ts"
-              dependencies:
-                - "@supabase/supabase-js"
-              notes: |
-                Per D28: PR diffs stored in Supabase Storage.
-                Use storage.from('pr_diffs').remove() with path prefix.
-                Fire-and-forget approach acceptable; orphaned files cleaned up in scheduled job.
-
           - id: "task-6.8-settings-ui"
             title: "Basic settings UI"
             description: |
@@ -2813,15 +1776,6 @@ epics:
               - "Notification preferences (future: email)"
               - "Repo management (disconnect repo)"
               - "User profile"
-            implementation:
-              files:
-                - "app/settings/page.tsx"
-                - "app/settings/repos/page.tsx"
-              dependencies: []
-              notes: |
-                MVP: basic settings structure.
-                Full notifications post-MVP.
-
       - id: "story-maintenance"
         title: "Re-extraction, auto-behaviors, and impact metrics"
         description: |
@@ -2850,16 +1804,6 @@ epics:
               - "Authoritative patterns preserved"
               - "Rejected patterns preserved"
               - "Backtest re-run after extraction"
-            implementation:
-              files:
-                - "components/repos/re-extract-button.tsx"
-                - "app/api/repos/[id]/re-extract/route.ts"
-              dependencies: []
-              notes: |
-                Per D9: Re-extraction behavior for each status.
-                CASCADE delete handles backtest_violations cleanup.
-                Run evidence re-capture for authoritative patterns.
-
           - id: "task-6.5a-evidence-recapture"
             title: "Evidence re-capture for authoritative patterns"
             description: |
@@ -2875,15 +1819,6 @@ epics:
               - "startLine, endLine, snippet updated"
               - "capturedAtSha updated to current HEAD"
               - "Missing patterns marked stale"
-            implementation:
-              files:
-                - "lib/extraction/evidence-recapture.ts"
-              dependencies: []
-              notes: |
-                Per D9: Evidence accuracy maintained automatically.
-                Batch multiple files into single prompt for efficiency.
-                Cost: ~$0.01-0.02 per file.
-
           - id: "task-6.7-impact-digest"
             title: "Build weekly impact digest dashboard widget"
             description: |
@@ -2899,16 +1834,6 @@ epics:
               - "Time saved calculation (violations × 15 min)"
               - "Top 3 patterns by violation count"
               - "Aggregated across all user's repos"
-            implementation:
-              files:
-                - "components/dashboard/impact-digest.tsx"
-                - "lib/metrics/impact.ts"
-              dependencies: []
-              notes: |
-                Per D12: Time saved formula.
-                AVG_REVIEW_MINUTES = 15 (from config).
-                Display: "~X hours saved"
-
           - id: "task-6.8a-evolution-badge"
             title: "Dashboard notification badge for pending evolution reviews"
             description: |
@@ -2923,15 +1848,6 @@ epics:
               - "Badge count on nav"
               - "Realtime updates via Supabase"
               - "Links to evolution review page"
-            implementation:
-              files:
-                - "components/nav/evolution-badge.tsx"
-                - "hooks/use-pending-evolutions.ts"
-              dependencies: []
-              notes: |
-                Subscribe to pattern_evolution_requests INSERT events.
-                Only show for pending status.
-
           - id: "task-6.9-logging"
             title: "Set up logging and observability"
             description: |
@@ -2946,15 +1862,6 @@ epics:
               - "Trigger.dev dashboard accessible"
               - "Supabase logs queryable"
               - "Key operations logged"
-            implementation:
-              files:
-                - "lib/logging.ts"
-              dependencies: []
-              notes: |
-                Use Trigger.dev built-in logging.
-                Supabase has logs in dashboard.
-                Consider adding Sentry for error tracking.
-
           - id: "task-6.10-auto-archive"
             title: "Implement daily auto-archive scheduled job"
             description: |
@@ -2970,16 +1877,6 @@ epics:
               - "Weak patterns unreviewed for 60+ days auto-rejected"
               - "rejectionReason set to 'Auto-dismissed: insufficient evidence'"
               - "Job execution logged for monitoring"
-            implementation:
-              files:
-                - "jobs/auto-archive.ts"
-              dependencies:
-                - "@trigger.dev/sdk"
-              notes: |
-                Per D13: Auto-behaviors for queue maintenance.
-                Uses extractedAt for age calculation.
-                Runs during low GitHub API usage hours.
-
           - id: "task-6.11-auth-deep-linking"
             title: "Implement auth flow deep linking with returnTo"
             description: |
@@ -2994,15 +1891,6 @@ epics:
               - "returnTo URL stored in cookie/session"
               - "Redirect to original URL post-login"
               - "Works for violation dismissal from PR comments"
-            implementation:
-              files:
-                - "app/auth/callback/route.ts"
-                - "lib/auth/deep-link.ts"
-              dependencies: []
-              notes: |
-                Critical for PR comment → app flow.
-                User clicks Dismiss → Auth → Back to dismiss page.
-
 # ============================================
 # DECISIONS (D1-D36)
 # ============================================
@@ -3054,11 +1942,16 @@ decisions:
       - "task-1.6-core-schema"
 
   - id: "D7"
-    title: "Tech stack: Supabase + Vercel + Trigger.dev"
-    choice: "Three best-in-class services"
-    rationale: "Each optimized for its purpose"
+    title: "Tech stack: Supabase + Trigger.dev (superseded by D37)"
+    choice: "Original: Supabase + Vercel + Trigger.dev"
+    rationale: "See D37 for current stack (Hono + Vite + TanStack Router)"
+
+  - id: "D37"
+    title: "Framework migration: Hono + Vite + TanStack Router"
+    choice: "Hono backend + Vite/React/TanStack Router frontend + tRPC"
+    rationale: "Lightweight, edge-ready, faster dev, type-safe"
     affects_tasks:
-      - "task-1.1-nextjs-init"
+      - "task-1.1-monorepo-init"
       - "task-1.2-supabase-setup"
       - "task-1.3-triggerdev-setup"
 

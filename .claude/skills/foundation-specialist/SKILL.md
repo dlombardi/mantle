@@ -305,23 +305,6 @@ chore: update dependencies
 docs: add API documentation
 ```
 
----
-
-## Beads Integration
-
-When working on infrastructure:
-```bash
-# Track infrastructure changes
-bd create "Configure Drizzle migrations"
-bd update <id> -s in-progress
-
-# Complete when verified
-bun run typecheck && bun run build
-bd complete <id>
-```
-
----
-
 ## Validation Commands
 
 ```bash

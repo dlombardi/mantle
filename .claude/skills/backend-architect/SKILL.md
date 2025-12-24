@@ -31,24 +31,6 @@ Invoke this skill when working on:
 
 ---
 
-## Beads Integration
-
-Track backend work with beads:
-```bash
-# Starting a new service
-bd create "Implement user preferences service"
-bd update <id> -s in-progress
-
-# Track job implementation
-bd create "Add background job for notifications"
-bd dep add <job-id> <service-id>  # Job depends on service
-
-# Complete when tested
-bun run test && bd complete <id>
-```
-
----
-
 ## Tech Stack
 
 | Layer | Technology | Purpose |

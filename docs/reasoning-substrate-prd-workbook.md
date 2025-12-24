@@ -386,7 +386,7 @@ Authoritative patterns serve as a single source of truth consumed through two en
 *Reference: Decision D30*
 
 ### 2.2 System Architecture
-`[Explored]`
+`[Explored]` · `[Updated: Dec 2025 — reflects D37 stack]`
 
 #### MVP Architecture Overview
 
@@ -414,10 +414,42 @@ The system implements an event-driven loop: **Extract → Validate → Enforce**
          │                    │                       │
          ▼                    ▼                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      SUPABASE (Postgres)                         │
+│              SUPABASE (Postgres) + Drizzle ORM                   │
 ├─────────────────────────────────────────────────────────────────┤
 │  Users │ Repos │ Patterns │ Evidence │ PRs │ Violations │ ...   │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+#### Monorepo Structure
+
+```
+mantle/
+├── apps/
+│   ├── api/                   # Hono backend (port 3001)
+│   │   ├── src/
+│   │   │   ├── index.ts       # Entry point, middleware
+│   │   │   ├── routes/        # API route handlers
+│   │   │   └── lib/
+│   │   │       ├── db/        # Drizzle schema + client
+│   │   │       ├── supabase/  # Supabase admin client
+│   │   │       └── trigger/   # Trigger.dev config
+│   │   └── drizzle.config.ts
+│   │
+│   └── web/                   # Vite + React frontend (port 3000)
+│       ├── src/
+│       │   ├── main.tsx       # React entry point
+│       │   ├── routes/        # TanStack Router files
+│       │   └── lib/           # Utilities (supabase.ts)
+│       └── vite.config.ts
+│
+├── packages/
+│   ├── trpc/                  # Shared tRPC router (@mantle/trpc)
+│   └── test-utils/            # Shared testing utilities
+│
+├── supabase/
+│   └── migrations/            # SQL migrations
+│
+└── turbo.json                 # Turborepo config
 ```
 
 #### Core Entities
@@ -2885,15 +2917,19 @@ Connect repo → Extract patterns (AI) → Surface candidates → Human validate
 *References: Decisions D4, D5, D6*
 
 #### Tech Stack
+`[Updated: Dec 2025]`
 
-| Layer | Service | Purpose |
-|-------|---------|---------|
-| Database | Supabase (Postgres) | Pattern storage, provenance, user data; realtime subscriptions for live updates |
-| Auth | Supabase Auth + GitHub App | User login (Supabase); repo access & webhooks (GitHub App) |
-| Web App | Vercel (Next.js) | Frontend + API routes |
-| Background Jobs | Trigger.dev | Long-running pattern extraction, PR analysis |
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Frontend** | Vite + React 18 + TanStack Router | Type-safe file-based routing SPA |
+| **Styling** | Tailwind CSS v4 + Base UI | Utility-first CSS with headless components |
+| **Backend** | Hono (Bun runtime) | Lightweight, edge-ready API server |
+| **API Layer** | tRPC | End-to-end type-safe RPC between frontend and backend |
+| **Database** | Supabase (Postgres) + Drizzle ORM | Pattern storage, provenance, user data; type-safe queries |
+| **Auth** | Supabase Auth + GitHub App | User login (Supabase); repo access & webhooks (GitHub App) |
+| **Background Jobs** | Trigger.dev | Long-running pattern extraction, PR analysis |
 
-*Reference: Decision D7*
+*References: Decisions D7, D37*
 
 #### Core Features (In Scope)
 `[Updated: Dec 2025]`
@@ -2992,19 +3028,21 @@ Phase 6: Polish (UX refinement + edge cases)
 ---
 
 #### Phase 1: Foundation
+`[Updated: Dec 2025 — reflects D37 stack migration]`
 **Goal:** Infrastructure running, data model implemented, auth working
 
 | Task | Description | Dependency |
 |------|-------------|------------|
-| 1.1 | Initialize Next.js project, deploy to Vercel | — |
-| 1.2 | Set up Supabase project (Postgres + Auth) | — |
-| 1.3 | Set up Trigger.dev project, connect to Vercel | — |
+| 1.1 | Initialize monorepo with Turborepo + Bun workspaces; create `apps/api` (Hono) and `apps/web` (Vite + TanStack Router) | — |
+| 1.2 | Set up Supabase project (Postgres + Auth); configure Drizzle ORM in `apps/api` | — |
+| 1.3 | Set up Trigger.dev project, connect to API app | — |
 | 1.4 | Create GitHub App (dev environment) | — |
-| 1.5 | Implement GitHub OAuth flow (user login via GitHub) | 1.2, 1.4 |
-| 1.6 | Design and migrate core schema: `users`, `repos`, `patterns`, `violations`, `provenance` | 1.2 |
+| 1.5 | Implement GitHub OAuth flow via Supabase Auth | 1.2, 1.4 |
+| 1.6 | Design and migrate core schema with Drizzle: `users`, `repos`, `patterns`, `violations`, `provenance` | 1.2 |
 | 1.7 | Implement GitHub App installation flow (user installs app, selects repos) | 1.4, 1.5 |
 | 1.8 | Store installation ID and repo metadata in DB; implement `getInstallationToken(installationId)` utility using `@octokit/auth-app` for on-demand token generation (D15) | 1.6, 1.7 |
-| 1.9 | Configure environment variables: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` in Vercel and Trigger.dev; add to `.env.example` for local dev (D15) | 1.4 |
+| 1.9 | Configure environment variables in `.env` files; add to `.env.example` for local dev (D15) | 1.4 |
+| 1.10 | Set up tRPC with shared `@mantle/trpc` package for type-safe API calls (D37) | 1.1, 1.2 |
 
 **Deliverable:** User can log in, install GitHub App, select repos — repos appear in dashboard (empty state)
 
@@ -3670,13 +3708,49 @@ These milestones are suitable for external demonstration (advisors, potential us
 
 ---
 
-### D7. [Dec 2025] Tech stack: Supabase + Vercel + Trigger.dev
-`[Decided]`
+### D7. [Dec 2025] Tech stack: Supabase + Trigger.dev (Original)
+`[Superseded by D37]`
 
 - **Context:** Need hosting for web app, database, and long-running background jobs
-- **Alternatives considered:** Railway (all-in-one), Vercel + Trigger.dev + Neon
-- **Rationale:** Supabase provides excellent Postgres DX, realtime subscriptions (live pattern updates), and auth; Vercel is best Next.js host; Trigger.dev handles long-running extraction jobs with good observability
-- **Implications:** Three services to manage, but each is best-in-class for its purpose
+- **Original decision:** Supabase + Vercel (Next.js) + Trigger.dev
+- **Status:** Superseded — see D37 for current stack
+
+---
+
+### D37. [Dec 2025] Framework migration: Hono + Vite + TanStack Router
+`[Decided]`
+
+- **Context:** Initial implementation used Next.js for both frontend and API routes. As the project evolved, the need for a cleaner separation between frontend and backend became apparent, along with faster development iteration.
+
+- **Alternatives considered:**
+  - Keep Next.js (rejected: slower dev server, monolithic structure)
+  - NestJS for backend (rejected: too heavyweight, decorator-heavy)
+  - Express/Fastify (rejected: Hono is lighter and Bun-native)
+
+- **Rationale:**
+  - **Hono:** Lightweight, edge-ready, native Bun support, simpler middleware model than NestJS
+  - **Vite:** Significantly faster HMR than Next.js, better DX for SPA development
+  - **TanStack Router:** Type-safe file-based routing, works perfectly with Vite
+  - **tRPC:** End-to-end type safety between frontend and backend, shared schema package
+  - **Base UI:** Headless components that work with Tailwind v4's new features
+
+- **Current stack:**
+  | Layer | Technology |
+  |-------|------------|
+  | Runtime | Bun 1.3+ |
+  | Frontend | Vite 6 + React 18 + TanStack Router |
+  | Backend | Hono 4.6 |
+  | API | tRPC 11 (shared @mantle/trpc package) |
+  | Styling | Tailwind CSS v4 + Base UI |
+  | Database | Supabase Postgres + Drizzle ORM |
+  | Testing | Vitest + Playwright |
+  | Monorepo | Turborepo + Bun workspaces |
+
+- **Implications:**
+  - Separate apps: `apps/api` (Hono) and `apps/web` (Vite)
+  - Shared packages: `packages/trpc` (router), `packages/test-utils`
+  - API runs on port 3001, frontend on port 3000
+  - No Vercel deployment requirement (can deploy anywhere that runs Bun)
 
 ---
 
@@ -3914,7 +3988,7 @@ These milestones are suitable for external demonstration (advisors, potential us
 - **Implementation:**
   - Remove `installationAccessToken` and `tokenExpiresAt` from Repo interface
   - Add utility function `getInstallationToken(installationId): Promise<string>`
-  - Store `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` in Vercel + Trigger.dev env vars
+  - Store `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` in environment variables
   - Use `@octokit/auth-app` for JWT generation and token requests
   - **Token lifecycle:** `@octokit/auth-app` handles caching and refresh automatically — tokens are cached internally and refreshed before expiry (~55 min into 1-hour lifetime). No manual caching code needed. For long-running jobs (e.g., extraction), create one Octokit instance at job start and reuse throughout.
 
@@ -3922,7 +3996,7 @@ These milestones are suitable for external demonstration (advisors, potential us
   - Simpler Repo schema (fewer fields)
   - No encryption code needed
   - No token refresh logic needed — library handles automatically
-  - Private key must be configured in all environments (Vercel, Trigger.dev, local dev)
+  - Private key must be configured in all environments (API server, Trigger.dev, local dev)
 
 ---
 
@@ -4882,6 +4956,7 @@ These milestones are suitable for external demonstration (advisors, potential us
 | Dec 2025 | 2.4 | Pre-dev audit resolution: Refactored FilesystemPatternEvidence to one-row-per-path design (matches PatternEvidence structure); moved `globPattern` and `antiPatternExamples` to Pattern interface (definition-level, not evidence-level); removed `structureTemplate` for MVP (skip mini-schema to avoid false positives on incremental PRs); added `filesystem_pattern_evidence` SQL table; file-structure patterns remain context-file-only with no enforcement | Claude + Darien |
 | Dec 2025 | 2.4, 2.5, 6.2, Appendix A | Pre-dev audit resolution (minor fixes): (1) Fixed InsightFacts.primaryLocation type in D24 to use CodeCategory (7 values) instead of incorrect 5-value inline type; (2) Clarified D28 storage path uses Repo UUID; (3) Added execution time to task 6.10 auto-archive job (03:00 UTC); (4) Added idempotency note to task 5b.8 for webhook retry handling; (5) Added filter options to candidate queue wireframe (Status, Tier, Type, Stuck badge); (6) Documented filter dropdown options | Claude + Darien |
 | Dec 2025 | 2.4, 6.2, Appendix A | Pre-dev audit resolution (11 issues): **CRITICAL:** Added tier derivation for FilesystemPatternConfidence (FILESYSTEM_TIER_THRESHOLDS: strong/emerging/moderate/weak), 3 filesystem-specific insight rules (priority 89, 44, 34), updated InsightFacts with isFilesystemPattern and filesystemAdoption fields, now 18 rules total. **MAJOR:** Added RepoFile interface and SQL schema for evidence autocomplete; added syncStatus field to ContextFileConfig (never/synced/pending); added backtest_violations cleanup to task 4.3 (reject) and task 6.10 (auto-archive); added PatternEvolutionStatus type with historical/cancelled states and closedAt field for audit trail. **MINOR:** Clarified task 3.16 filesystem extraction timing; added default severity to task 4.16; added task 6.6a for PR diff storage cleanup on repo disconnect; added empty context file handling to task 5a.3; clarified debounce trigger scope in task 5a.7; added continuous staleness detection to Out of Scope; added task 5b.16 for PR lifecycle handling; updated task 2.9 and 3.19 references. | Claude + Darien |
+| Dec 2025 | 2.2, 6.1, Appendix A | **D37: Framework migration to Hono + Vite + TanStack Router.** Updated tech stack from Next.js on Vercel to: Hono backend (Bun runtime), Vite + React + TanStack Router frontend, tRPC for type-safe API, Base UI for components, Tailwind CSS v4, Drizzle ORM. Added monorepo structure diagram. Superseded D7, updated D15 (removed Vercel references). Updated Phase 1 tasks to reflect new architecture (tasks 1.1, 1.3, 1.9, 1.10). | Claude |
 
 ---
 

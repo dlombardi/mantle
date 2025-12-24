@@ -40,7 +40,7 @@ Core loop: **Extract → Validate → Enforce**
 
 | Layer | Technology | Notes |
 |-------|------------|-------|
-| **Frontend** | Vite + React 18 + TanStack Router | Type-safe file-based routing |
+| **Frontend** | Vite + React 19 + TanStack Router | Type-safe file-based routing |
 | **Styling** | Tailwind CSS + Inter font | Dark mode via CSS variables |
 | **Backend** | Hono (Bun runtime) | Lightweight, edge-ready API |
 | **Database** | Supabase (Postgres) + Drizzle ORM | 12-table schema with RLS |
@@ -99,6 +99,48 @@ mantle/
 | `/api/example` | GET | Validation demo (pagination) |
 | `/api/example/:id` | GET | Validation demo (UUID param) |
 | `/api/example/connect` | POST | Validation demo (JSON body) |
+
+---
+
+## Agent Skills
+
+This project has specialized skills in `.claude/skills/`. **Always check for relevant skills before starting any task.**
+
+### Available Skills
+
+| Skill | Domain | When to Activate |
+|-------|--------|------------------|
+| `hono-specialist` | API routes, middleware, Hono handlers | Files in `apps/api/src/routes/`, keywords: `route`, `middleware`, `handler`, `c.json` |
+| `frontend-architect` | React components, hooks, state | Files in `apps/web/src/`, keywords: `component`, `useState`, `useQuery`, `tsx` |
+| `testing-consultant` | Tests, mocks, fixtures | Files matching `*.test.ts`, `*.spec.ts`, keywords: `test`, `mock`, `vitest` |
+| `backend-architect` | Services, jobs, error handling | Files in `apps/api/src/services/`, `apps/api/src/jobs/`, keywords: `service`, `job`, `error` |
+| `foundation-specialist` | Config, tooling, monorepo | Files matching `*.config.*`, `drizzle/`, keywords: `config`, `eslint`, `migration` |
+| `orchestrator-specialist` | Task routing, planning | Default for unclear tasks, keywords: `plan`, `breakdown`, `coordinate` |
+
+### Skill Protocol
+
+1. **Before starting any task**, identify which skill(s) apply based on file paths and task description
+2. **Read the SKILL.md**: `cat .claude/skills/<skill-name>/SKILL.md`
+3. **Check references**: Skills may have example code in their `references/` subdirectory
+4. **Multiple skills**: Tasks often span domains—read all relevant skills (e.g., `hono-specialist` + `testing-consultant` for "add endpoint with tests")
+
+### Activation Precedence
+
+1. Explicit user request (`use the backend-architect skill`)
+2. File path patterns (editing `routes/*.ts` → hono-specialist)
+3. Keyword matching in task description
+4. Default: `orchestrator-specialist` for ambiguous tasks
+
+### Handoff Protocol
+
+When work spans multiple skill domains, use this format:
+
+```
+HANDOFF TO: <skill-name>
+CONTEXT: <brief summary of current state>
+TASK: <specific work for the next skill>
+FILES: <relevant files to read>
+```
 
 ---
 
@@ -284,3 +326,62 @@ bun run test:all          # Unit + E2E
 | Web Vitest | `apps/web/vitest.config.ts` |
 | Playwright | `playwright.config.ts` (root) |
 | Turbo tasks | `turbo.json` |
+
+---
+
+## Beads Workflow Integration
+
+This project uses [beads_viewer](https://github.com/Dicklesworthstone/beads_viewer) for issue tracking. Issues are stored in `.beads/` and tracked in git.
+
+### Essential Commands
+
+```bash
+# View issues (launches TUI - avoid in automated sessions)
+bv
+
+# CLI commands for agents (use these instead)
+bd ready              # Show issues ready to work (no blockers)
+bd list --status=open # All open issues
+bd show <id>          # Full issue details with dependencies
+bd create --title="..." --type=task --priority=2
+bd update <id> --status=in_progress
+bd close <id> --reason="Completed"
+bd close <id1> <id2>  # Close multiple issues at once
+bd sync               # Commit and push changes
+```
+
+### Workflow Pattern
+
+1. **Start**: Run `bd ready` to find actionable work
+2. **Claim**: Use `bd update <id> --status=in_progress`
+3. **Work**: Implement the task
+4. **Complete**: Use `bd close <id>`
+5. **Sync**: Always run `bd sync` at session end
+
+### Key Concepts
+
+- **Dependencies**: Issues can block other issues. `bd ready` shows only unblocked work.
+- **Priority**: P0=critical, P1=high, P2=medium, P3=low, P4=backlog (use numbers, not words)
+- **Types**: task, bug, feature, epic, question, docs
+- **Blocking**: `bd dep add <issue> <depends-on>` to add dependencies
+
+### Session Protocol
+
+**Before ending any session, run this checklist:**
+
+```bash
+git status              # Check what changed
+git add <files>         # Stage code changes
+bd sync                 # Commit beads changes
+git commit -m "..."     # Commit code
+bd sync                 # Commit any new beads changes
+git push                # Push to remote
+```
+
+### Best Practices
+
+- Check `bd ready` at session start to find available work
+- Update status as you work (in_progress → closed)
+- Create new issues with `bd create` when you discover tasks
+- Use descriptive titles and set appropriate priority/type
+- Always `bd sync` before ending session

@@ -48,40 +48,6 @@ User Request
 
 ---
 
-## Beads Workflow
-
-### Starting Work
-```bash
-# Check current work context
-bd prime
-
-# Create a new task
-bd create "Implement user authentication flow"
-
-# Add dependencies if task requires prior work
-bd dep add <new-id> <dependency-id>
-```
-
-### During Work
-```bash
-# Mark task as started
-bd update <id> -s in-progress
-
-# Check what's ready to work on
-bd ready
-```
-
-### Completing Work
-```bash
-# Mark task complete
-bd complete <id>
-
-# Verify completion
-bd show <id>
-```
-
----
-
 ## Multi-Skill Coordination
 
 ### Handoff Format
