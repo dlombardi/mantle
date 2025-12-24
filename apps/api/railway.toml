@@ -1,0 +1,15 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd ../.. && bun install && bun run --filter=@mantle/api build"
+
+[build.nixpacks]
+# Force Bun as package manager (npm doesn't support workspace:* protocol)
+pkgs = ["bun"]
+aptPkgs = []
+
+[deploy]
+startCommand = "bun run start"
+healthcheckPath = "/api/health/live"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
