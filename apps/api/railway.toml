@@ -1,11 +1,13 @@
 [build]
 builder = "nixpacks"
+# Skip nixpacks install phase, do everything in build
 buildCommand = "cd ../.. && bun install && bun run --filter=@mantle/api build"
 
 [build.nixpacks]
-# Force Bun as package manager (npm doesn't support workspace:* protocol)
+# Force Bun, skip npm auto-detection
 pkgs = ["bun"]
 aptPkgs = []
+installCmd = "echo 'Skipping npm install - using bun in build phase'"
 
 [deploy]
 startCommand = "bun run start"
