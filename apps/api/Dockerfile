@@ -15,9 +15,9 @@ RUN turbo prune @mantle/api --docker
 FROM base AS installer
 WORKDIR /app
 
-# Copy pruned package.json files and lockfile
+# Copy pruned package.json files and ORIGINAL lockfile (not pruned)
 COPY --from=pruner /app/out/json/ .
-COPY --from=pruner /app/out/bun.lock ./bun.lock
+COPY --from=pruner /app/bun.lock ./bun.lock
 
 # Install dependencies
 RUN bun install --frozen-lockfile
