@@ -5,12 +5,6 @@
   "installCommand": "bun install",
   "framework": null,
   "outputDirectory": "apps/web/dist",
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://$VERCEL_URL/api/:path*"
-    }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",
