@@ -12,6 +12,7 @@ import {
   liveResponseSchema,
   readyResponseSchema,
   healthResponseSchema,
+  versionResponseSchema,
 } from './health';
 
 // Import mocked modules
@@ -101,6 +102,31 @@ describe('Health Routes', () => {
       const data = healthResponseSchema.parse(await res.json());
       expect(data.status).toBe('unhealthy');
       expect(data.services.database.connected).toBe(false);
+    });
+  });
+
+  describe('GET /health/version', () => {
+    it('should return version info with expected fields', async () => {
+      const res = await app.request('/health/version');
+
+      expect(res.status).toBe(200);
+      const data = versionResponseSchema.parse(await res.json());
+      expect(data).toHaveProperty('version');
+      expect(data).toHaveProperty('environment');
+      expect(data).toHaveProperty('commit');
+      expect(typeof data.version).toBe('string');
+      expect(typeof data.environment).toBe('string');
+      expect(typeof data.commit).toBe('string');
+    });
+
+    it('should return local commit when VERCEL_GIT_COMMIT_SHA not set', async () => {
+      const res = await app.request('/health/version');
+
+      const data = versionResponseSchema.parse(await res.json());
+      // In test environment, Vercel env vars are not set
+      expect(data.commit).toBe('local');
+      // npm_package_version is set by Bun, so version comes from package.json
+      expect(data.version).toMatch(/^\d+\.\d+\.\d+/);
     });
   });
 });

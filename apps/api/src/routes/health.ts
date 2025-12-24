@@ -37,10 +37,17 @@ export const healthResponseSchema = z.object({
   }),
 });
 
+export const versionResponseSchema = z.object({
+  version: z.string(),
+  environment: z.string(),
+  commit: z.string(),
+});
+
 // Infer types from schemas
 export type LiveResponse = z.infer<typeof liveResponseSchema>;
 export type ReadyResponse = z.infer<typeof readyResponseSchema>;
 export type HealthResponse = z.infer<typeof healthResponseSchema>;
+export type VersionResponse = z.infer<typeof versionResponseSchema>;
 
 export const healthRoutes = new Hono();
 
@@ -97,5 +104,18 @@ healthRoutes.get('/ready', async (c) => {
   }
 
   const response: ReadyResponse = { ready: true };
+  return c.json(response);
+});
+
+/**
+ * Version endpoint - returns app version and deployment metadata.
+ * Useful for debugging and verifying deployments.
+ */
+healthRoutes.get('/version', (c) => {
+  const response: VersionResponse = {
+    version: process.env.npm_package_version ?? '0.0.0',
+    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
+    commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'local',
+  };
   return c.json(response);
 });
