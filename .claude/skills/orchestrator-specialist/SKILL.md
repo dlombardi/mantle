@@ -139,3 +139,169 @@ BEADS: #42
 2. Route structural changes to domain skill
 3. Route test updates to testing-consultant
 4. Foundation-specialist for config changes
+
+---
+
+## Three-Phase Agentic Workflow
+
+For beads that require automated QA verification, use this workflow:
+
+```
+Phase 1: Planning     →  Phase 2: Implementation  →  Phase 3: Verification
+(planning-workflow)      (domain skills)             (qa-workflow)
+```
+
+### Phase 1: Planning
+
+**Trigger:** New bead or `bd ready`
+
+**Agent:** Load `planning-workflow` skill
+
+**Steps:**
+1. Pick bead from `bd ready`
+2. Analyze codebase for implementation approach
+3. Write `plan.md` artifact
+4. Review and approve plan
+
+**Output:**
+```
+.beads/artifacts/<bead-id>/plan.md
+```
+
+**Transition:**
+```bash
+bd update <bead-id> --status in_progress
+bd label add <bead-id> phase:building
+```
+
+### Phase 2: Implementation
+
+**Trigger:** Approved plan from Phase 1
+
+**Agent:** Domain skill (hono-specialist, frontend-architect, etc.)
+
+**Steps:**
+1. Read `plan.md`
+2. Implement code changes
+3. Write tests
+4. Push to trigger Vercel preview
+5. Write `qa-checklist.md`
+
+**Output:**
+```
+.beads/artifacts/<bead-id>/qa-checklist.md
+```
+
+**Transition:**
+```bash
+bd label add <bead-id> phase:verifying
+```
+
+### Phase 3: Verification
+
+**Trigger:** Implementation complete, preview deployed
+
+**Agent:** Spawn fresh `qa-workflow` via Task tool
+
+**Steps:**
+1. Read `qa-checklist.md`
+2. Run QA harness against preview
+3. Generate `qa-report.md`
+4. Determine pass/fail
+
+**Output:**
+```
+.beads/artifacts/<bead-id>/qa-report.md
+```
+
+**Exit Conditions:**
+| Outcome | Action |
+|---------|--------|
+| PASS | `bd close <id>`, add `qa:passed` |
+| FAIL (<3) | Loop to Phase 2 |
+| FAIL (=3) | Add `needs-human`, escalate |
+
+### Spawning QA Agent (Fresh Context)
+
+```typescript
+// Use Task tool to spawn QA with isolated context
+Task({
+  subagent_type: 'Explore',  // Or custom qa-workflow type
+  prompt: `
+    FRESH CONTEXT - You are the QA agent for Phase 3.
+
+    Bead: ${beadId}
+    Preview URL: ${previewUrl}
+    Iteration: ${iteration}/3
+
+    1. Read .beads/artifacts/${beadId}/qa-checklist.md
+    2. Run QA harness: bun run test:qa-harness --preview-url=${previewUrl}
+    3. Write results to .beads/artifacts/${beadId}/qa-report.md
+
+    Load the qa-workflow skill for detailed instructions.
+  `
+})
+```
+
+### Artifact Flow
+
+```
+Phase 1                    Phase 2                    Phase 3
+────────                   ────────                   ────────
+plan.md ──────────────────→ (reads)
+                           qa-checklist.md ──────────→ (reads)
+                                                      qa-report.md
+                           ←─────────────────────────── (on failure)
+```
+
+### Label Conventions
+
+```bash
+# Phase tracking
+bd label add <id> phase:planning
+bd label add <id> phase:building
+bd label add <id> phase:verifying
+
+# Iteration tracking
+bd label add <id> qa:iteration-1
+bd label add <id> qa:iteration-2
+bd label add <id> qa:iteration-3
+
+# Outcomes
+bd label add <id> qa:passed
+bd label add <id> needs-human
+```
+
+### Example: Full Workflow
+
+```bash
+# Phase 1: Planning
+bd ready                                    # Find work
+bd update bd-a1b2 --status in_progress
+# Planner creates .beads/artifacts/bd-a1b2/plan.md
+bd label add bd-a1b2 phase:building
+
+# Phase 2: Implementation
+# Builder reads plan.md, writes code
+# Builder writes .beads/artifacts/bd-a1b2/qa-checklist.md
+git push                                    # Triggers Vercel preview
+bd label add bd-a1b2 phase:verifying
+
+# Phase 3: Verification (spawned as fresh session)
+# QA reads qa-checklist.md
+# QA runs harness against preview
+# QA writes .beads/artifacts/bd-a1b2/qa-report.md
+
+# If PASS:
+bd close bd-a1b2 --reason "QA passed"
+bd label add bd-a1b2 qa:passed
+
+# If FAIL (iteration < 3):
+bd update bd-a1b2 --note "QA iteration 1 failed - see qa-report.md"
+bd label add bd-a1b2 qa:iteration-1
+# Loop back to Phase 2
+
+# If FAIL (iteration = 3):
+bd label add bd-a1b2 needs-human
+bd update bd-a1b2 --note "Max iterations reached, escalating"
+```

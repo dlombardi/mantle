@@ -99,6 +99,9 @@ mantle/
 | `/api/example` | GET | Validation demo (pagination) |
 | `/api/example/:id` | GET | Validation demo (UUID param) |
 | `/api/example/connect` | POST | Validation demo (JSON body) |
+| `/api/seed` | GET | List available seed scenarios (dev/preview only) |
+| `/api/seed` | POST | Load seed scenario (dev/preview only) |
+| `/api/seed` | DELETE | Reset to empty state (dev/preview only) |
 
 ---
 
@@ -115,7 +118,9 @@ This project has specialized skills in `.claude/skills/`. **Always check for rel
 | `testing-consultant` | Tests, mocks, fixtures | Files matching `*.test.ts`, `*.spec.ts`, keywords: `test`, `mock`, `vitest` |
 | `backend-architect` | Services, jobs, error handling | Files in `apps/api/src/services/`, `apps/api/src/jobs/`, keywords: `service`, `job`, `error` |
 | `foundation-specialist` | Config, tooling, monorepo | Files matching `*.config.*`, `drizzle/`, keywords: `config`, `eslint`, `migration` |
-| `orchestrator-specialist` | Task routing, planning | Default for unclear tasks, keywords: `plan`, `breakdown`, `coordinate` |
+| `orchestrator-specialist` | Task routing, planning, 3-phase workflow | Default for unclear tasks, keywords: `plan`, `breakdown`, `coordinate` |
+| `planning-workflow` | Implementation planning (Phase 1) | Keywords: `plan bead`, `phase 1`, `implementation plan` |
+| `qa-workflow` | QA verification (Phase 3) | Keywords: `verify`, `qa`, `phase 3`, `qa-checklist` |
 
 ### Skill Protocol
 
@@ -385,3 +390,123 @@ git push                # Push to remote
 - Create new issues with `bd create` when you discover tasks
 - Use descriptive titles and set appropriate priority/type
 - Always `bd sync` before ending session
+
+---
+
+## Three-Phase Agentic Workflow
+
+For beads that require automated QA verification, use this structured workflow:
+
+```
+Phase 1: Planning     →  Phase 2: Implementation  →  Phase 3: Verification
+(planning-workflow)      (domain skills)             (qa-workflow)
+```
+
+### Phase 1: Planning
+
+**Trigger:** New bead from `bd ready`
+
+**Skills:** `orchestrator-specialist` + `planning-workflow`
+
+**Steps:**
+1. Pick bead with `bd ready`
+2. Analyze codebase for implementation approach
+3. Write `.beads/artifacts/<bead-id>/plan.md`
+4. Review and approve plan
+
+**Transition:**
+```bash
+bd update <bead-id> --status in_progress
+bd label add <bead-id> phase:building
+```
+
+### Phase 2: Implementation
+
+**Trigger:** Approved plan from Phase 1
+
+**Skills:** Domain skill (hono-specialist, frontend-architect, etc.)
+
+**Steps:**
+1. Read `plan.md`
+2. Implement code changes
+3. Write tests
+4. Push to trigger Vercel preview
+5. Write `.beads/artifacts/<bead-id>/qa-checklist.md`
+
+**Transition:**
+```bash
+bd label add <bead-id> phase:verifying
+```
+
+### Phase 3: Verification
+
+**Trigger:** Implementation complete, preview deployed
+
+**Skills:** `qa-workflow` (spawned as fresh subprocess)
+
+**Steps:**
+1. Read `qa-checklist.md`
+2. Run QA harness: `bun run test:qa-harness --preview-url=<url>`
+3. Generate `.beads/artifacts/<bead-id>/qa-report.md`
+
+**Exit Conditions:**
+
+| Outcome | Action |
+|---------|--------|
+| PASS | `bd close <id> --reason "QA passed"` |
+| FAIL (<3 iterations) | Loop to Phase 2 |
+| FAIL (=3 iterations) | `bd label add <id> needs-human` |
+
+### Artifact Locations
+
+```
+.beads/artifacts/<bead-id>/
+├── plan.md           # Phase 1 output
+├── qa-checklist.md   # Phase 2 output
+└── qa-report.md      # Phase 3 output
+```
+
+### Label Conventions
+
+```bash
+# Phase tracking
+bd label add <id> phase:planning
+bd label add <id> phase:building
+bd label add <id> phase:verifying
+
+# Iteration tracking
+bd label add <id> qa:iteration-1
+bd label add <id> qa:iteration-2
+bd label add <id> qa:iteration-3
+
+# Outcomes
+bd label add <id> qa:passed
+bd label add <id> needs-human
+```
+
+### QA Harness Commands
+
+```bash
+# Full QA harness run
+bun run test:qa-harness -- \
+  --preview-url=<url> \
+  --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
+  --bead-id=<bead-id>
+
+# List available seed scenarios
+curl <preview-url>/api/seed
+
+# Seed preview with test data
+curl -X POST <preview-url>/api/seed \
+  -H "Content-Type: application/json" \
+  -d '{"scenario": "with-test-user"}'
+```
+
+### Related Skills
+
+| Skill | Role in Workflow |
+|-------|------------------|
+| `planning-workflow` | Phase 1 - Creates implementation plans |
+| `qa-workflow` | Phase 3 - Runs verification |
+| `orchestrator-specialist` | Coordinates phases, manages handoffs |
+| `testing-consultant` | Phase 2 - Test patterns during implementation |

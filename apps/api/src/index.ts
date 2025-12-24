@@ -8,6 +8,7 @@ import { closeDb, getDb } from './lib/db';
 import { initTrigger } from './lib/trigger';
 import { healthRoutes } from './routes/health';
 import { exampleRoutes } from './routes/example';
+import { seedRoutes } from './routes/seed';
 import { appRouter, createContext } from '@mantle/trpc';
 
 // Initialize Trigger.dev SDK
@@ -38,6 +39,9 @@ app.route('/health', healthRoutes);
 
 // Example routes (demonstrates validation patterns)
 app.route('/example', exampleRoutes);
+
+// Seed routes (dev/preview only - for QA verification)
+app.route('/seed', seedRoutes);
 
 // tRPC routes - type-safe RPC endpoints
 app.use(
