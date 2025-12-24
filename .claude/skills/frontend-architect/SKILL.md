@@ -56,8 +56,8 @@ bun run typecheck && bd complete <id>
 | Bundler | Vite 6.0 |
 | Framework | React 18.3 |
 | Routing | TanStack Router (file-based) |
+| Data | tRPC + React Query |
 | Styling | Tailwind CSS + Inter font |
-| Data | Supabase client |
 | Types | TypeScript strict mode |
 
 ---
@@ -66,7 +66,7 @@ bun run typecheck && bd complete <id>
 
 ```
 apps/web/src/
-├── main.tsx              # Entry point, router setup
+├── main.tsx              # Entry point, tRPC + router setup
 ├── routeTree.gen.ts      # Auto-generated (don't edit)
 ├── routes/               # TanStack Router file-based routes
 │   ├── __root.tsx        # Root layout
@@ -76,8 +76,9 @@ apps/web/src/
 │   ├── ui/               # Primitives (Button, Input, Modal)
 │   └── [feature]/        # Feature-specific components
 ├── hooks/                # Custom React hooks
-├── lib/                  # Utilities
-│   └── supabase.ts       # Supabase client singleton
+├── lib/
+│   ├── trpc.ts           # tRPC React client
+│   └── supabase.ts       # Supabase client (auth only)
 └── styles/
     └── index.css         # Tailwind + global styles
 ```
@@ -237,43 +238,91 @@ function SettingsForm() {
 
 ---
 
-## Data Fetching
+## Data Fetching with tRPC
 
-### Supabase Client
+### Query Pattern
 ```typescript
-import { getSupabaseClient } from '@/lib/supabase';
+import { trpc } from '@/lib/trpc';
 
-async function fetchPatterns(repoId: string) {
-  const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('patterns')
-    .select('*')
-    .eq('repo_id', repoId);
-
-  if (error) throw error;
-  return data;
-}
-```
-
-### API Proxy
-Vite proxies `/api/*` to the backend:
-```typescript
-// Calls apps/api via proxy
-const response = await fetch('/api/patterns');
-const data = await response.json();
-```
-
-### Future: TanStack Query
-When TanStack Query is added:
-```typescript
-import { useQuery } from '@tanstack/react-query';
-
-function usePatterns(repoId: string) {
-  return useQuery({
-    queryKey: ['patterns', repoId],
-    queryFn: () => fetchPatterns(repoId),
+function PatternList({ repoId }: { repoId: string }) {
+  const { data, isLoading, error } = trpc.patterns.list.useQuery({
+    repoId,
+    status: 'candidate',
   });
+
+  if (isLoading) return <Spinner />;
+  if (error) return <ErrorMessage error={error.message} />;
+
+  return (
+    <ul>
+      {data?.items.map((pattern) => (
+        <PatternCard key={pattern.id} pattern={pattern} />
+      ))}
+    </ul>
+  );
 }
+```
+
+### Mutation Pattern
+```typescript
+function PromoteButton({ patternId }: { patternId: string }) {
+  const utils = trpc.useUtils();
+
+  const { mutate, isPending } = trpc.patterns.updateStatus.useMutation({
+    onSuccess: () => {
+      // Invalidate queries to refetch
+      utils.patterns.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  return (
+    <button
+      onClick={() => mutate({ id: patternId, status: 'authoritative' })}
+      disabled={isPending}
+    >
+      {isPending ? 'Promoting...' : 'Promote to Authoritative'}
+    </button>
+  );
+}
+```
+
+### Optimistic Updates
+```typescript
+const { mutate } = trpc.patterns.updateStatus.useMutation({
+  onMutate: async (newData) => {
+    // Cancel outgoing refetches
+    await utils.patterns.list.cancel();
+
+    // Snapshot previous value
+    const previousData = utils.patterns.list.getData();
+
+    // Optimistically update
+    utils.patterns.list.setData(undefined, (old) => ({
+      ...old,
+      items: old?.items.map((p) =>
+        p.id === newData.id ? { ...p, status: newData.status } : p
+      ),
+    }));
+
+    return { previousData };
+  },
+  onError: (err, newData, context) => {
+    // Rollback on error
+    utils.patterns.list.setData(undefined, context?.previousData);
+  },
+});
+```
+
+### Prefetching
+```typescript
+// In route loader or on hover
+const utils = trpc.useUtils();
+
+// Prefetch data
+await utils.patterns.list.prefetch({ repoId });
 ```
 
 ---

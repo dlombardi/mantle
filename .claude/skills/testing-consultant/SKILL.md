@@ -83,6 +83,10 @@ mantle/
 │           └── lib/
 │               └── supabase.test.ts
 ├── packages/
+│   ├── trpc/                       # tRPC router tests
+│   │   ├── vitest.config.ts
+│   │   └── src/
+│   │       └── router.test.ts      # createCaller tests
 │   └── test-utils/                 # Shared test utilities
 │       └── src/
 │           ├── mocks/supabase.ts   # createMockSupabaseClient
@@ -245,6 +249,102 @@ describe('Health Routes', () => {
 - Tests use `schema.parse()` instead of `as` type assertions
 - Runtime validation catches API contract violations
 - TypeScript infers types from schemas automatically
+
+---
+
+## tRPC Testing Patterns
+
+### Testing with createCaller
+
+tRPC provides `createCaller()` for direct procedure invocation without HTTP:
+
+```typescript
+import { describe, it, expect } from 'vitest';
+import { appRouter } from '@mantle/trpc';
+import { TRPCError } from '@trpc/server';
+import type { Context } from '@mantle/trpc';
+
+// Mock context factory
+function createMockContext(user: Context['user'] = null): Context {
+  return {
+    db: {} as Context['db'],  // Mock or real test DB
+    user,
+    req: new Request('http://localhost/trpc'),
+  };
+}
+
+function createAuthContext(userId = 'test-user-id'): Context {
+  return createMockContext({
+    id: userId,
+    githubId: 12345,
+    githubUsername: 'testuser',
+  });
+}
+
+describe('patterns router', () => {
+  describe('list', () => {
+    it('requires authentication', async () => {
+      const caller = appRouter.createCaller(createMockContext());
+
+      await expect(
+        caller.patterns.list({ repoId: 'uuid' })
+      ).rejects.toThrow(TRPCError);
+    });
+
+    it('returns paginated patterns when authenticated', async () => {
+      const caller = appRouter.createCaller(createAuthContext());
+
+      const result = await caller.patterns.list({
+        repoId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+        page: 1,
+        limit: 10,
+      });
+
+      expect(result.items).toBeDefined();
+      expect(result.page).toBe(1);
+    });
+  });
+
+  describe('updateStatus', () => {
+    it('validates rejection reason when rejecting', async () => {
+      const caller = appRouter.createCaller(createAuthContext());
+
+      await expect(
+        caller.patterns.updateStatus({
+          id: 'uuid',
+          status: 'rejected',
+          // Missing required rejectionReason
+        })
+      ).rejects.toThrow(TRPCError);
+    });
+  });
+});
+```
+
+### Testing Input Validation
+
+Zod validation errors become TRPCError with code 'BAD_REQUEST':
+
+```typescript
+it('validates input schema', async () => {
+  const caller = appRouter.createCaller(createAuthContext());
+
+  await expect(
+    caller.patterns.list({
+      repoId: 'not-a-uuid',  // Invalid UUID
+    })
+  ).rejects.toMatchObject({
+    code: 'BAD_REQUEST',
+  });
+});
+```
+
+### Benefits of createCaller Testing
+
+- **No HTTP overhead** - Direct procedure invocation
+- **Full type inference** - Input/output types checked at compile time
+- **Context control** - Easily test auth/unauth scenarios
+- **Middleware testing** - Auth middleware runs as in production
 
 ---
 

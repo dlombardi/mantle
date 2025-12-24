@@ -39,7 +39,9 @@ mantle/
 ├── apps/
 │   ├── web/          # Vite + React frontend
 │   └── api/          # Hono + Bun backend
-├── packages/         # Shared packages (if any)
+├── packages/
+│   ├── trpc/         # Shared tRPC types + routers
+│   └── test-utils/   # Shared test utilities
 ├── supabase/
 │   ├── config.toml   # Supabase CLI config
 │   └── migrations/   # SQL migrations

@@ -1,6 +1,6 @@
 # Backend Architect
 
-Establishes backend architecture patterns: Hono API design, error handling, Drizzle ORM database access, background jobs, and service layer conventions.
+Establishes backend architecture patterns: tRPC router design, error handling, Drizzle ORM database access, background jobs, and service layer conventions.
 
 ---
 
@@ -55,60 +55,93 @@ bun run test && bd complete <id>
 |-------|------------|---------|
 | Runtime | Bun | Fast JS runtime |
 | Framework | Hono | Lightweight web framework |
+| API | tRPC + @trpc/server | Type-safe API layer |
 | ORM | Drizzle | Type-safe database queries |
-| Validation | Zod + @hono/zod-validator | Runtime validation |
+| Validation | Zod | Runtime validation (tRPC input) |
 | Jobs | Trigger.dev | Background job processing |
 | Auth/Realtime | Supabase client | Auth, storage, realtime only |
 
 ---
 
-## API Response Patterns
+## tRPC Router Patterns
 
-### Response Envelope
+### Router Structure
+tRPC routers live in `packages/trpc/src/routers/` and are merged into the main appRouter.
+
 ```typescript
-type ApiResponse<T> = {
-  data: T | null;
-  error: ApiError | null;
-  meta?: {
-    page?: number;
-    pageSize?: number;
-    total?: number;
-  };
-};
-```
+// packages/trpc/src/routers/patterns.router.ts
+import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
+import { router, protectedProcedure } from '../trpc';
 
-### Hono Response Helpers
-```typescript
-// lib/api/response.ts
-import { Context } from 'hono';
+export const patternsRouter = router({
+  list: protectedProcedure
+    .input(z.object({
+      repoId: z.string().uuid(),
+      status: z.enum(['candidate', 'authoritative']).optional(),
+      page: z.number().int().positive().default(1),
+      limit: z.number().int().positive().max(100).default(20),
+    }))
+    .query(async ({ ctx, input }) => {
+      const patterns = await ctx.db.query.patterns.findMany({
+        where: eq(patterns.repoId, input.repoId),
+        limit: input.limit,
+        offset: (input.page - 1) * input.limit,
+      });
+      return { items: patterns, page: input.page, limit: input.limit };
+    }),
 
-export function success<T>(c: Context, data: T, meta?: object) {
-  return c.json({ data, error: null, meta });
-}
-
-export function error(c: Context, code: string, message: string, status: number) {
-  return c.json({ data: null, error: { code, message } }, status);
-}
-
-// Usage in route
-app.get('/api/patterns/:id', async (c) => {
-  const id = c.req.param('id');
-  const pattern = await getPattern(id);
-  if (!pattern) {
-    return error(c, 'NOT_FOUND', 'Pattern not found', 404);
-  }
-  return success(c, pattern);
+  updateStatus: protectedProcedure
+    .input(z.object({
+      id: z.string().uuid(),
+      status: z.enum(['authoritative', 'rejected', 'deferred']),
+      rationale: z.string().max(1000).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, status, rationale } = input;
+      const [updated] = await ctx.db.update(patterns)
+        .set({ status, rationale, validatedBy: ctx.user.id })
+        .where(eq(patterns.id, id))
+        .returning();
+      return { success: true, pattern: updated };
+    }),
 });
 ```
 
-### Route Naming Convention
+### Procedure Types
+```typescript
+// publicProcedure - No auth required (health checks)
+// protectedProcedure - Requires authenticated user in context
 ```
-GET    /api/patterns              # List patterns
-GET    /api/patterns/:id          # Get single pattern
-POST   /api/patterns              # Create pattern
-PATCH  /api/patterns/:id          # Update pattern
-DELETE /api/patterns/:id          # Delete pattern
-POST   /api/patterns/:id/promote  # Action on pattern
+
+### tRPC Namespace Convention
+```
+trpc.repos.list            # List repositories
+trpc.repos.getById         # Get single repo
+trpc.repos.connect         # Connect new repo
+trpc.patterns.list         # List patterns
+trpc.patterns.updateStatus # Update pattern status
+trpc.patterns.addEvidence  # Add evidence to pattern
+```
+
+### Error Handling in Procedures
+```typescript
+import { TRPCError } from '@trpc/server';
+
+// In a procedure
+if (!pattern) {
+  throw new TRPCError({
+    code: 'NOT_FOUND',
+    message: `Pattern ${id} not found`,
+  });
+}
+
+if (pattern.repo.userId !== ctx.user.id) {
+  throw new TRPCError({
+    code: 'FORBIDDEN',
+    message: 'Not authorized to modify this pattern',
+  });
+}
 ```
 
 ---
@@ -401,27 +434,52 @@ supabase.channel('repos').on('postgres_changes', callback);
 
 ---
 
-## Validation with Zod
+## Input Validation with Zod
 
-### Route Validation
+### tRPC Input Validation
+Zod schemas are defined inline in procedure `.input()` calls:
+
 ```typescript
-import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 
-const createPatternSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().min(1),
-  type: z.enum(['code', 'filesystem']),
+export const patternsRouter = router({
+  create: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1, 'Name is required'),
+      description: z.string().min(1),
+      type: z.enum(['code', 'filesystem']),
+      repoId: z.string().uuid(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // input is fully typed: { name: string; description: string; ... }
+      const [pattern] = await ctx.db.insert(patterns).values(input).returning();
+      return pattern;
+    }),
+});
+```
+
+### Reusable Schemas
+For complex or shared validation, define schemas separately:
+
+```typescript
+// packages/trpc/src/schemas/pattern.ts
+export const patternStatusSchema = z.enum([
+  'candidate',
+  'authoritative',
+  'rejected',
+  'deferred',
+]);
+
+export const paginationSchema = z.object({
+  page: z.number().int().positive().default(1),
+  limit: z.number().int().positive().max(100).default(20),
 });
 
-app.post(
-  '/api/patterns',
-  zValidator('json', createPatternSchema),
-  async (c) => {
-    const data = c.req.valid('json');
-    // data is typed as { name: string; description: string; type: 'code' | 'filesystem' }
-  }
-);
+// In router
+.input(paginationSchema.extend({
+  repoId: z.string().uuid(),
+  status: patternStatusSchema.optional(),
+}))
 ```
 
 ---

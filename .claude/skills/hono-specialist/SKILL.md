@@ -2,6 +2,10 @@
 
 Provides guidance for developing API routes with the Hono framework on Bun runtime.
 
+> **Note:** tRPC is now the primary API pattern for business logic.
+> This skill covers REST routes for health checks, GitHub webhooks,
+> and the tRPC middleware mount. See `backend-architect` for tRPC patterns.
+
 ---
 
 ## Activation
@@ -49,6 +53,7 @@ bun run typecheck && bd complete <id>
 |-------|------------|---------|
 | Runtime | Bun | 1.3.0 |
 | Framework | Hono | 4.6.14 |
+| tRPC Adapter | @hono/trpc-server | 0.3.0 |
 | Server Adapter | @hono/node-server | 1.13.7 |
 | Validation | @hono/zod-validator | 0.4.2 |
 
@@ -58,10 +63,10 @@ bun run typecheck && bd complete <id>
 
 ```
 apps/api/src/
-├── index.ts              # App entry point, route registration
-├── routes/               # Route handlers
-│   ├── health.ts        # Health check route
-│   └── example.ts       # Example CRUD routes
+├── index.ts              # App entry, tRPC mount + route registration
+├── routes/               # REST route handlers
+│   ├── health.ts        # Health check routes (Kubernetes)
+│   └── github.ts        # GitHub webhooks
 ├── middleware/           # Custom middleware
 └── lib/
     ├── db/              # Drizzle ORM (see backend-architect)
@@ -71,7 +76,55 @@ apps/api/src/
 
 ---
 
-## Route Patterns
+## tRPC Middleware Mount
+
+Most business logic uses tRPC. Mount it alongside REST routes:
+
+```typescript
+// apps/api/src/index.ts
+import { Hono } from 'hono';
+import { trpcServer } from '@hono/trpc-server';
+import { appRouter, createContext } from '@mantle/trpc';
+import { healthRoutes } from './routes/health';
+import { getDb } from './lib/db/client';
+
+const app = new Hono();
+
+// tRPC for business logic
+app.use(
+  '/trpc/*',
+  trpcServer({
+    router: appRouter,
+    endpoint: '/api/trpc',
+    createContext: async ({ req }) => {
+      return createContext({
+        req,
+        getDb,
+        getUser: async () => extractUserFromRequest(req),
+      });
+    },
+  }),
+);
+
+// REST routes for infrastructure
+app.route('/health', healthRoutes);
+
+export default app;
+```
+
+### What Uses REST vs tRPC
+
+| Route | Protocol | Reason |
+|-------|----------|--------|
+| `/trpc/*` | tRPC | Business logic, type-safe |
+| `/health/*` | REST | Kubernetes probes |
+| `/github/webhooks` | REST | GitHub signature verification |
+
+---
+
+## REST Route Patterns
+
+Use REST routes only for health checks and external webhooks:
 
 ### Basic Route
 ```typescript
