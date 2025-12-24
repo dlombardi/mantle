@@ -27,7 +27,8 @@ export function customRender(
   ui: ReactElement,
   options?: Omit<RenderOptions, 'wrapper'> & WrapperOptions,
 ) {
-  const { initialPath: _initialPath, ...renderOptions } = options || {};
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { initialPath, ...renderOptions } = options || {};
 
   return render(ui, { wrapper: AllTheProviders, ...renderOptions });
 }
