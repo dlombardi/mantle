@@ -1,0 +1,16 @@
+# Beads issue tracking (local only)
+.beads/
+
+# Local development
+.env.local
+.env*.local
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Node modules (Vercel installs fresh)
+node_modules/

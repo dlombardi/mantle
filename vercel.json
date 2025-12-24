@@ -30,9 +30,6 @@
       ]
     }
   ],
-  "env": {
-    "VERCEL_ENV": "@vercel-env"
-  },
   "build": {
     "env": {
       "NODE_ENV": "production"
