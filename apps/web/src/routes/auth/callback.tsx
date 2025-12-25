@@ -21,19 +21,21 @@ function AuthCallbackPage() {
     const handleCallback = async () => {
       const supabase = getSupabaseClient();
 
-      // Get the code from URL params
+      // Check for error in URL (query params or hash)
       const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      const errorParam = params.get('error');
-      const errorDescription = params.get('error_description');
+      const hashParams = new URLSearchParams(window.location.hash.slice(1));
+
+      const errorParam = params.get('error') || hashParams.get('error');
+      const errorDescription = params.get('error_description') || hashParams.get('error_description');
 
       if (errorParam) {
         setError(errorDescription || errorParam);
         return;
       }
 
+      // Handle PKCE flow (code in query params)
+      const code = params.get('code');
       if (code) {
-        // Exchange code for session
         const { error: exchangeError } =
           await supabase.auth.exchangeCodeForSession(code);
 
@@ -41,6 +43,22 @@ function AuthCallbackPage() {
           setError(exchangeError.message);
           return;
         }
+      }
+
+      // Handle implicit flow (tokens in hash fragment)
+      // Supabase automatically detects and stores tokens from URL hash
+      // Just verify we have a session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        setError(sessionError.message);
+        return;
+      }
+
+      if (!session && !code) {
+        // No session and no code - something went wrong
+        setError('No authentication data received');
+        return;
       }
 
       // Redirect to home on success
