@@ -23,6 +23,7 @@
     "@trpc/client": "^11.0.0-rc.704",
     "@trpc/react-query": "^11.0.0-rc.704",
     "clsx": "^2.1.1",
+    "lucide-react": "^0.562.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "superjson": "^2.2.1",

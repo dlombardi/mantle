@@ -1,15 +1,18 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { LandingPage } from '@/pages/landing-page';
+import { AuthenticatedLayout } from '@/layouts/authenticated-layout';
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async () => {
     const { getSupabaseClient } = await import('@/lib/supabase');
     const supabase = getSupabaseClient();
     const { data: { session } } = await supabase.auth.getSession();
 
-    if (session) {
-      throw redirect({ to: '/dashboard' });
+    if (!session) {
+      throw redirect({
+        to: '/',
+        search: { redirect: location.pathname },
+      });
     }
   },
-  component: LandingPage,
+  component: AuthenticatedLayout,
 });
