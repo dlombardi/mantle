@@ -187,6 +187,35 @@ Task({
 })
 ```
 
+### Phase 2 Completion Gate
+
+Before transitioning from Phase 2 → Phase 3, verify these artifacts exist:
+
+| Artifact | Location | Purpose |
+|----------|----------|---------|
+| `qa-checklist.md` | `.beads/artifacts/<bead-id>/qa-checklist.md` | Testable acceptance criteria |
+| Code changes | Committed and pushed | Triggers Vercel preview deploy |
+| Unit tests | `*.test.ts` files | Verify code logic locally |
+
+**If `qa-checklist.md` is missing**, the builder (domain skill) must create it before Phase 3 can begin.
+
+### Bead Closure Rules
+
+> ⚠️ **CRITICAL: NEVER use `bd close` without Phase 3 completion.**
+
+| Scenario | Action |
+|----------|--------|
+| Unit tests pass locally | **NOT SUFFICIENT** - Phase 3 still required |
+| `qa-checklist.md` missing | Return to Phase 2, create checklist |
+| Phase 3 not executed | Spawn QA agent (see above) |
+| QA passed | `bd close <id> --reason "QA passed"` |
+| QA failed 3x | `bd label add <id> needs-human` (do NOT close) |
+
+**Why Phase 3 matters:**
+- Unit tests verify code logic in isolation
+- Phase 3 verifies the feature works in the **preview environment** (real Supabase, real Vercel)
+- Production issues often stem from integration failures, not unit test gaps
+
 ### Routing After QA Failure
 
 When QA fails and iteration < 3, hand back to the original builder skill:

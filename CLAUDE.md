@@ -470,6 +470,25 @@ bd label add <bead-id> phase:verifying
 | FAIL (<3 iterations) | Loop to Phase 2 |
 | FAIL (=3 iterations) | `bd label add <id> needs-human` |
 
+### Bead Closure Requirements
+
+> ⚠️ **CRITICAL: NEVER close a bead without completing Phase 3.**
+
+Before using `bd close`, verify ALL conditions are met:
+
+1. **qa-checklist.md exists** - `.beads/artifacts/<bead-id>/qa-checklist.md` was created in Phase 2
+2. **Phase 3 was executed** - `qa-workflow` skill was invoked and ran the QA harness
+3. **QA passed OR escalated** - Either `qa-report.md` shows PASS, or `needs-human` label was applied
+
+**Unit tests passing locally is NOT sufficient.** The QA harness must verify the feature works in the preview environment.
+
+If you find yourself about to close a bead without Phase 3:
+1. STOP
+2. Create the `qa-checklist.md`
+3. Push changes to trigger preview deployment
+4. Run `qa-workflow` skill
+5. Only then proceed with `bd close`
+
 ### Vercel Preview Access
 
 Preview deployments require `VERCEL_PROTECTION_BYPASS` in `.env.local`. The QA harness reads this automatically.

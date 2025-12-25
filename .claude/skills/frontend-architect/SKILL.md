@@ -171,6 +171,50 @@ export function PatternCard({ pattern, onSelect }: PatternCardProps) {
 
 ---
 
+## Component Creation Guidelines
+
+When a new UI component is needed:
+
+1. **Check @base-ui/react first**
+   - Browse [base-ui components](https://base-ui.com/react/components/) for a suitable primitive
+   - Base-UI provides unstyled, accessible components: Button, Checkbox, Dialog, Menu, Popover, Select, Slider, Switch, Tabs, Tooltip, etc.
+
+2. **Check existing wrappers**
+   - Look in `apps/web/src/components/ui/` for existing styled components
+   - Currently available: `Button`, `Checkbox`, `Dialog`, `Switch`
+
+3. **Create wrapper if needed**
+   - If base-ui has the primitive but we don't have a wrapper, create one
+   - Follow the pattern in `components/ui/button.tsx`:
+     - Import from `@base-ui/react/<component>`
+     - Add Tailwind styling with variant/size props
+     - Use `cn()` utility for class merging
+     - Export with proper TypeScript types
+
+4. **Only create custom components when**
+   - base-ui doesn't have a suitable primitive
+   - The component is app-specific (e.g., PatternCard, RepoSelector)
+
+**Example wrapper pattern:**
+```typescript
+import { Button as BaseButton } from '@base-ui/react/button';
+import { cn } from '@/lib/utils';
+
+const variants = { default: '...', outline: '...' } as const;
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = 'default', className, ...props }, ref) => (
+    <BaseButton
+      ref={ref}
+      className={cn(variants[variant], className)}
+      {...props}
+    />
+  )
+);
+```
+
+---
+
 ## State Management
 
 ### Local State (useState)
@@ -581,6 +625,48 @@ bun run dev          # Development server (port 3000)
 
 ---
 
+## Phase 2 Completion Checklist
+
+When implementing a bead, complete ALL items before considering Phase 2 done:
+
+- [ ] Code changes implemented per `plan.md`
+- [ ] Unit/component tests written and passing
+- [ ] TypeScript and lint checks pass
+- [ ] `.beads/artifacts/<bead-id>/qa-checklist.md` created (see template below)
+- [ ] Changes committed and pushed to trigger preview deployment
+
+**Then transition to Phase 3:**
+```bash
+bd label add <bead-id> phase:verifying
+```
+
+**HANDOFF TO: qa-workflow** - Do NOT close the bead until Phase 3 completes.
+
+### qa-checklist.md Template
+
+```markdown
+# QA Checklist: <bead-title>
+
+## Prerequisites
+- [ ] Preview deployment is live
+- [ ] Test user can access the preview URL
+
+## Functional Tests
+1. [ ] <Step 1 description>
+2. [ ] <Step 2 description>
+3. [ ] <Expected outcome>
+
+## Edge Cases
+- [ ] <Edge case 1>
+- [ ] <Edge case 2>
+
+## Regression Checks
+- [ ] Existing functionality still works
+- [ ] No console errors
+```
+
+---
+
 ## Handoffs
 
 | Downstream | When |
@@ -588,6 +674,7 @@ bun run dev          # Development server (port 3000)
 | `testing-consultant` | For component tests |
 | `backend-architect` | When UI needs new API endpoints |
 | `hono-specialist` | For specific API route implementation |
+| `qa-workflow` | After Phase 2 complete, for verification |
 
 | Upstream | When |
 |----------|------|

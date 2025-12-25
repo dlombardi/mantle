@@ -51,11 +51,18 @@ Extract from bead:
 
 ### Step 2: Codebase Analysis
 
-Before writing the plan, analyze:
+**Read relevant skills first:**
+1. Identify skills based on file paths and task keywords (see CLAUDE.md → Skill Protocol)
+2. Read each skill's SKILL.md
+3. Check each skill's `references/` for example code
+4. Note any existing components, patterns, or conventions mentioned
+
+**Then analyze the codebase:**
 1. **Existing patterns** - How similar features are implemented
-2. **File structure** - Where new code should live
-3. **Dependencies** - What modules/services to integrate with
-4. **Test coverage** - What test patterns exist
+2. **Existing components** - What UI/service components already exist (e.g., `apps/web/src/components/ui/`)
+3. **File structure** - Where new code should live
+4. **Dependencies** - What modules/services to integrate with
+5. **Test coverage** - What test patterns exist
 
 ### Step 3: Write plan.md Artifact
 

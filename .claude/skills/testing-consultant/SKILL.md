@@ -571,6 +571,24 @@ cd apps/web && bun run test --watch
 
 ---
 
+## Testing Scope in Three-Phase Workflow
+
+This skill covers **unit, integration, and E2E tests** (Phase 2). QA verification (Phase 3) is handled by `qa-workflow`.
+
+| Test Type | Phase | Environment | Purpose |
+|-----------|-------|-------------|---------|
+| Unit tests | Phase 2 | Local (mocked) | Verify code logic in isolation |
+| Integration tests | Phase 2 | Local (mocked) | Verify module boundaries |
+| E2E tests | Phase 2 | Local (real servers) | Verify flows end-to-end |
+| QA Harness | Phase 3 | Preview (real Supabase, Vercel) | Verify feature in production-like env |
+
+**Important distinction:**
+- ✅ Unit tests passing means code logic is correct
+- ❌ Unit tests passing does NOT mean Phase 3 can be skipped
+- Phase 3 catches integration issues (real auth, real database, real deployment)
+
+---
+
 ## Handoffs
 
 | Upstream | When |
