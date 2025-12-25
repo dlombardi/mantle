@@ -87,7 +87,7 @@ function GitHubSetupPage() {
           </p>
           <a
             href="/dashboard"
-            className="text-blue-600 hover:text-blue-800 underline"
+            className="text-accent-orange hover:text-accent-orange/80 underline transition-colors"
           >
             Go to Dashboard
           </a>
@@ -101,7 +101,7 @@ function GitHubSetupPage() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-8">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white mx-auto mb-4" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-orange mx-auto mb-4" />
           <p className="text-muted-foreground">Verifying installation...</p>
         </div>
       </main>
@@ -119,7 +119,7 @@ function GitHubSetupPage() {
           <p className="text-muted-foreground mb-6">{verifyError.message}</p>
           <a
             href="/dashboard"
-            className="text-blue-600 hover:text-blue-800 underline"
+            className="text-accent-orange hover:text-accent-orange/80 underline transition-colors"
           >
             Return to Dashboard
           </a>
@@ -171,7 +171,7 @@ function GitHubSetupPage() {
 
         {loadingRepos ? (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 dark:border-white mx-auto mb-2" />
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent-orange mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">
               Loading repositories...
             </p>
@@ -187,14 +187,14 @@ function GitHubSetupPage() {
               <div className="flex gap-2">
                 <button
                   onClick={selectAll}
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="text-sm text-accent-orange hover:text-accent-orange/80 transition-colors"
                 >
                   Select all
                 </button>
                 <span className="text-muted-foreground">|</span>
                 <button
                   onClick={clearSelection}
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="text-sm text-accent-orange hover:text-accent-orange/80 transition-colors"
                 >
                   Clear
                 </button>
@@ -207,9 +207,9 @@ function GitHubSetupPage() {
                 <label
                   key={repo.id}
                   className={`
-                    flex items-center p-4 border rounded-lg cursor-pointer transition-colors
+                    flex items-center p-4 border border-border rounded-md cursor-pointer transition-all
                     ${repo.isConnected ? 'bg-muted opacity-60 cursor-not-allowed' : 'hover:bg-muted/50'}
-                    ${selectedRepos.includes(repo.id) && !repo.isConnected ? 'border-blue-500 bg-blue-50 dark:bg-blue-950' : ''}
+                    ${selectedRepos.includes(repo.id) && !repo.isConnected ? 'border-accent-orange bg-accent-orange/10' : ''}
                   `}
                 >
                   <input
@@ -258,7 +258,7 @@ function GitHubSetupPage() {
             disabled={
               selectedRepos.length === 0 || connectMutation.isPending
             }
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-accent-orange text-accent-orange-foreground rounded-md hover:bg-accent-orange/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {connectMutation.isPending
               ? 'Connecting...'
@@ -266,7 +266,7 @@ function GitHubSetupPage() {
           </button>
           <button
             onClick={() => navigate({ to: '/dashboard' })}
-            className="px-4 py-2 border rounded-lg hover:bg-muted"
+            className="px-4 py-2 border border-border rounded-md hover:bg-muted transition-colors"
           >
             Cancel
           </button>
