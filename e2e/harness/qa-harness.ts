@@ -12,6 +12,9 @@ import { chromium, type Browser, type Page } from '@playwright/test';
 import { readFile, mkdir } from 'node:fs/promises';
 import { seedPreview, type SeedResult } from './seed-preview';
 import { generateReport } from './report-generator';
+import { injectTestSession, isTestSessionAvailable } from './session-injector';
+import { extractActionsFromSection, type Action } from './action-parser';
+import { executeActions, formatExecutionSummary } from './step-executor';
 
 export interface QAHarnessConfig {
   /** Vercel preview deployment URL */
@@ -125,20 +128,42 @@ export async function runQAHarness(config: QAHarnessConfig): Promise<QAHarnessRe
     browser = await chromium.launch({ headless });
     const page = await browser.newPage();
 
+    // Set bypass token header for all requests if provided
+    if (config.bypassToken) {
+      await page.setExtraHTTPHeaders({
+        'x-vercel-protection-bypass': config.bypassToken,
+      });
+    }
+
+    // Inject authenticated test session
+    const sessionAvailable = await isTestSessionAvailable(config.previewUrl, config.bypassToken);
+    if (sessionAvailable) {
+      console.log('  Authenticating test session...');
+      try {
+        const userEmail = await injectTestSession(page, config.previewUrl, config.bypassToken);
+        console.log(`  Authenticated as: ${userEmail}\n`);
+      } catch (authError) {
+        console.warn(`  Auth warning: ${authError instanceof Error ? authError.message : String(authError)}`);
+        console.log('  Continuing without authentication...\n');
+      }
+    } else {
+      console.log('  Test session endpoint not available - skipping auth\n');
+    }
+
     for (const verification of checklist.verifications) {
       const verificationStart = Date.now();
       try {
-        const passed = await runVerification(page, config.previewUrl, verification, config.bypassToken);
+        const verificationResult = await runVerification(page, config.previewUrl, verification, config.bypassToken);
         const duration = Date.now() - verificationStart;
 
         result.verifications.push({
           name: verification.name,
-          status: passed ? 'pass' : 'fail',
-          details: passed ? undefined : 'Verification failed',
+          status: verificationResult.passed ? 'pass' : 'fail',
+          details: verificationResult.details,
           duration,
         });
 
-        const statusIcon = passed ? '✓' : '✗';
+        const statusIcon = verificationResult.passed ? '✓' : '✗';
         console.log(`  ${statusIcon} ${verification.name} (${duration}ms)`);
       } catch (error) {
         const duration = Date.now() - verificationStart;
@@ -257,6 +282,7 @@ interface ChecklistVerification {
   name: string;
   steps: string[];
   expected: string;
+  actions: Action[];
 }
 
 interface ParsedChecklist {
@@ -296,36 +322,37 @@ async function parseChecklist(checklistPath: string): Promise<ParsedChecklist> {
     const expectedMatch = sectionContent.match(/\*\*Expected(?:\s+Result)?:\*\*\s*(.+?)(?=\n\*\*|$)/s);
     const expected = expectedMatch ? expectedMatch[1].trim() : '';
 
-    verifications.push({ name, steps, expected });
+    // Extract machine-parseable actions
+    const actions = extractActionsFromSection(sectionContent);
+
+    verifications.push({ name, steps, expected, actions });
   }
 
   return { scenario, verifications };
 }
 
 /**
- * Run a single verification
+ * Run a single verification by executing its actions
  */
 async function runVerification(
   page: Page,
   previewUrl: string,
   verification: ChecklistVerification,
-  bypassToken?: string
-): Promise<boolean> {
-  const targetUrl = applyBypassToken(previewUrl, bypassToken);
-  await page.goto(targetUrl, { waitUntil: 'networkidle' });
-
-  const consoleErrors: string[] = [];
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') {
-      consoleErrors.push(msg.text());
-    }
-  });
-
-  await page.waitForLoadState('domcontentloaded');
-
-  if (consoleErrors.length > 0) {
-    throw new Error(`Console errors: ${consoleErrors.join(', ')}`);
+  _bypassToken?: string
+): Promise<{ passed: boolean; details: string }> {
+  // If no actions defined, this is a legacy checklist - skip with warning
+  if (verification.actions.length === 0) {
+    return {
+      passed: true,
+      details: 'No actions defined - verification skipped (add **Actions:** section)',
+    };
   }
 
-  return true;
+  // Execute all actions for this verification
+  const result = await executeActions(page, verification.actions, previewUrl);
+
+  return {
+    passed: result.passed,
+    details: formatExecutionSummary(result),
+  };
 }

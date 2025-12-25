@@ -17,6 +17,7 @@ import { getDb } from './lib/db';
 import { healthRoutes } from './routes/health';
 import { exampleRoutes } from './routes/example';
 import { seedRoutes } from './routes/seed';
+import { testSessionRoutes } from './routes/test-session';
 import { appRouter, createContext } from '@mantle/trpc';
 
 /**
@@ -59,6 +60,9 @@ export function createApp(options: { enableLogger?: boolean } = {}) {
 
   // Seed routes (dev/preview only - for QA verification)
   app.route('/seed', seedRoutes);
+
+  // Test session routes (dev/preview only - for QA automation)
+  app.route('/test/session', testSessionRoutes);
 
   // tRPC routes - type-safe RPC endpoints
   app.use(
