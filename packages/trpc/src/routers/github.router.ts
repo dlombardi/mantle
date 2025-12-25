@@ -20,7 +20,7 @@ type DrizzleDb = PostgresJsDatabase;
  * Get GitHub App installation URL.
  * The app name comes from environment or defaults to the known app.
  */
-const GITHUB_APP_NAME = process.env.GITHUB_APP_NAME ?? 'reasoning-substrate-dev';
+const GITHUB_APP_NAME = process.env.GITHUB_APP_NAME ?? 'mantle-dev';
 
 export const githubRouter = router({
   /**

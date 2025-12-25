@@ -73,7 +73,7 @@ function ConnectRepoButton() {
 
   if (error || !data?.url) {
     // Fallback to hardcoded URL if tRPC fails
-    const fallbackUrl = 'https://github.com/apps/reasoning-substrate-dev/installations/new';
+    const fallbackUrl = 'https://github.com/apps/mantle-dev/installations/new';
     return (
       <a
         href={fallbackUrl}
