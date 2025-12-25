@@ -8,6 +8,7 @@
 import { router, publicProcedure } from './trpc';
 import { reposRouter } from './routers/repos.router';
 import { patternsRouter } from './routers/patterns.router';
+import { githubRouter } from './routers/github.router';
 
 /**
  * Main application router.
@@ -25,6 +26,7 @@ export const appRouter = router({
   // Feature routers
   repos: reposRouter,
   patterns: patternsRouter,
+  github: githubRouter,
 
   // Future routers:
   // violations: violationsRouter,
