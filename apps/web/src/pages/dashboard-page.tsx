@@ -57,7 +57,7 @@ function StatCard({ title, value, description }: StatCardProps) {
  * Uses tRPC to get the installation URL for the configured app.
  */
 function ConnectRepoButton() {
-  const { data, isLoading } = trpc.github.getInstallationUrl.useQuery();
+  const { data, isLoading, error } = trpc.github.getInstallationUrl.useQuery();
 
   if (isLoading) {
     return (
@@ -71,10 +71,24 @@ function ConnectRepoButton() {
     );
   }
 
+  if (error || !data?.url) {
+    // Fallback to hardcoded URL if tRPC fails
+    const fallbackUrl = 'https://github.com/apps/reasoning-substrate-dev/installations/new';
+    return (
+      <a
+        href={fallbackUrl}
+        className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
+      >
+        <GitHubIcon className="w-5 h-5 mr-2" />
+        Connect Repository
+      </a>
+    );
+  }
+
   return (
     <a
-      href={data?.url}
-      className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+      href={data.url}
+      className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
     >
       <GitHubIcon className="w-5 h-5 mr-2" />
       Connect Repository
