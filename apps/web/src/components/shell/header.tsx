@@ -8,7 +8,7 @@ interface HeaderProps {
 
 export function Header({ onToggleSidebar }: HeaderProps) {
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-background px-4">
+    <header className="flex h-14 items-center justify-between border-b border-sidebar-border bg-background px-4">
       <div className="flex items-center gap-4">
         {/* Mobile sidebar toggle */}
         <Button

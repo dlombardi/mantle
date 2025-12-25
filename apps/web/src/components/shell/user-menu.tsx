@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { LogOut, User } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -11,8 +12,14 @@ import {
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   if (!user) return null;
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate({ to: '/' });
+  };
 
   const username = user.user_metadata?.user_name || user.email || 'User';
   const avatarUrl = user.user_metadata?.avatar_url;
@@ -42,7 +49,7 @@ export function UserMenu() {
           Profile
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => signOut()}>
+        <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign out
         </DropdownMenuItem>
