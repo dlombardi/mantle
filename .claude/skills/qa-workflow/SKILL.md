@@ -50,6 +50,64 @@ The QA harness needs BOTH URLs (test session endpoint lives on Railway).
 
 ---
 
+## QA Checklist Format (CRITICAL)
+
+The harness parses `qa-checklist.md` looking for specific patterns. **Incorrect format = 0/0 tests run.**
+
+### Section Heading Format
+
+```markdown
+### Test 1: Description Here
+### Test 2: Another Test
+### AC1: Acceptance Criteria Style Also Works
+```
+
+**WRONG:** `### 1. Description` — missing `Test` prefix, uses `.` instead of `:`
+
+### Required Sections Per Test
+
+Each test MUST have an `**Actions:**` section with machine-parseable commands:
+
+```markdown
+### Test 1: Dashboard Loads
+
+**Steps:**
+1. Navigate to /dashboard
+2. Verify welcome message displays
+
+**Expected:** Dashboard renders correctly
+
+**Actions:**
+- navigate: /dashboard
+- waitForLoadState: networkidle
+- assertTextVisible: Welcome back
+- assertElementVisible: heading "Dashboard"
+```
+
+### Action Syntax Reference
+
+| Action | Syntax | Notes |
+|--------|--------|-------|
+| Navigate | `navigate: /path` | Relative to preview URL |
+| Click button | `click: button "Label"` | Uses `getByRole('button')` |
+| Click link | `click: link "Label"` | Uses `getByRole('link')` |
+| Click text | `click: text "Label"` | Uses `getByText()` |
+| Assert text visible | `assertTextVisible: Some text` | Fails if text appears multiple times |
+| Assert element | `assertElementVisible: heading "Title"` | Use for headings to avoid duplicates |
+| Assert URL | `assertUrlContains: /path` | Partial match |
+| Wait | `waitForLoadState: networkidle` | Options: `load`, `domcontentloaded`, `networkidle` |
+
+### Common Mistakes
+
+| Mistake | Problem | Fix |
+|---------|---------|-----|
+| `assertTextVisible: Repositories` | Matches sidebar + heading + description (3 elements) | Use `assertElementVisible: heading "Repositories"` |
+| Missing `**Actions:**` section | Test silently skipped, shows as 0/0 | Add Actions section |
+| `### 1. Title` | Regex doesn't match | Use `### Test 1: Title` |
+| Testing unauthenticated flow | Session is already injected by harness | Skip or test auth redirect differently |
+
+---
+
 ## Protocol
 
 1. **Load QA checklist** — `.beads/artifacts/<bead-id>/qa-checklist.md`
