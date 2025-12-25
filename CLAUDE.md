@@ -402,6 +402,17 @@ Phase 1: Planning     →  Phase 2: Implementation  →  Phase 3: Verification
 (planning-workflow)      (domain skills)             (qa-workflow)
 ```
 
+### Prerequisites
+
+Before running the workflow, ensure:
+
+1. **Vercel preview environment** is configured (auto-deploys on push)
+2. **Railway preview environment** exists with `VERCEL_ENV=preview`
+3. **Supabase preview branch** exists with current schema
+4. **Bypass token** is set in `.env.local` (see Vercel Preview Access below)
+
+See `docs/preview-environment-setup.md` for full setup instructions.
+
 ### Phase 1: Planning
 
 **Trigger:** New bead from `bd ready`
@@ -410,9 +421,10 @@ Phase 1: Planning     →  Phase 2: Implementation  →  Phase 3: Verification
 
 **Steps:**
 1. Pick bead with `bd ready`
-2. Analyze codebase for implementation approach
-3. Write `.beads/artifacts/<bead-id>/plan.md`
-4. Review and approve plan
+2. **Immediately sync** to persist bead: `bd sync`
+3. Analyze codebase for implementation approach
+4. Write `.beads/artifacts/<bead-id>/plan.md`
+5. Review and approve plan
 
 **Transition:**
 ```bash
@@ -446,8 +458,9 @@ bd label add <bead-id> phase:verifying
 
 **Steps:**
 1. Read `qa-checklist.md`
-2. Run QA harness: `bun run test:qa-harness --preview-url=<url>`
-3. Generate `.beads/artifacts/<bead-id>/qa-report.md`
+2. Wait for Vercel preview to be ready
+3. Run QA harness (see full CLI reference below)
+4. Generate `.beads/artifacts/<bead-id>/qa-report.md`
 
 **Exit Conditions:**
 
@@ -457,7 +470,31 @@ bd label add <bead-id> phase:verifying
 | FAIL (<3 iterations) | Loop to Phase 2 |
 | FAIL (=3 iterations) | `bd label add <id> needs-human` |
 
-### Artifact Locations
+### Vercel Preview Access
+
+Preview deployments require authentication bypass:
+
+```bash
+# 1. Get bypass token from Vercel Dashboard:
+#    Project Settings → Deployment Protection → Protection Bypass → Generate
+
+# 2. Add to .env.local (already in .env.local.example):
+VERCEL_PROTECTION_BYPASS=<your-token>
+
+# 3. QA harness reads this automatically, or pass explicitly:
+--bypass-token=<token>
+```
+
+### Preview URL Patterns
+
+| Branch | URL Pattern |
+|--------|-------------|
+| `preview` (stable) | `https://mantle-git-preview-<vercel-team>.vercel.app` |
+| Feature branches | `https://mantle-git-<branch>-<vercel-team>.vercel.app` |
+
+**Discovery:** Run `vercel ls mantle` or check Vercel dashboard.
+
+### Artifact Storage
 
 ```
 .beads/artifacts/<bead-id>/
@@ -465,6 +502,23 @@ bd label add <bead-id> phase:verifying
 ├── qa-checklist.md   # Phase 2 output
 └── qa-report.md      # Phase 3 output
 ```
+
+**Important:** This directory is **gitignored** (local only). Artifacts don't survive if:
+- Bead ID changes during sync
+- Working directory is cleaned
+
+For critical beads, back up artifacts or reference content in bead notes.
+
+### Bead Lifecycle Warning
+
+**Always sync immediately after creating a bead:**
+
+```bash
+bd create --title="..." --type=task --priority=2
+bd sync  # ← Critical: persists bead to git before it can be purged
+```
+
+Without immediate sync, beads can be purged during subsequent `bd sync` operations.
 
 ### Label Conventions
 
@@ -484,23 +538,76 @@ bd label add <id> qa:passed
 bd label add <id> needs-human
 ```
 
-### QA Harness Commands
+### QA Harness Full Reference
 
 ```bash
-# Full QA harness run
 bun run test:qa-harness -- \
-  --preview-url=<url> \
-  --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
-  --bead-id=<bead-id>
+  --preview-url=<url>              # Required: Vercel preview URL
+  --checklist=<path>               # Required: Path to qa-checklist.md
+  --bead-id=<id>                   # Required: Bead ID for artifact output
+  --bypass-token=<token>           # Vercel protection bypass (or use VERCEL_PROTECTION_BYPASS env)
+  --skip-seed                      # Skip database seeding (for DB-free endpoints)
+  --headed                         # Run browser visibly (for debugging)
+  --iteration=<1-3>                # Track retry iteration (default: 1)
+  --timeout=<seconds>              # Timeout in seconds (default: 300)
+```
 
-# List available seed scenarios
+**Examples:**
+
+```bash
+# Full run with seeding
+bun run test:qa-harness -- \
+  --preview-url=https://mantle-git-preview-team.vercel.app \
+  --checklist=.beads/artifacts/bead-001/qa-checklist.md \
+  --bead-id=bead-001
+
+# Skip seeding for endpoints that don't need database
+bun run test:qa-harness -- \
+  --preview-url=https://mantle-git-preview-team.vercel.app \
+  --checklist=.beads/artifacts/bead-002/qa-checklist.md \
+  --bead-id=bead-002 \
+  --skip-seed
+
+# Debug mode with visible browser
+bun run test:qa-harness -- \
+  --preview-url=http://localhost:3000 \
+  --checklist=.beads/artifacts/bead-003/qa-checklist.md \
+  --bead-id=bead-003 \
+  --headed \
+  --skip-seed
+```
+
+### Seed API Reference
+
+```bash
+# List available scenarios
 curl <preview-url>/api/seed
 
-# Seed preview with test data
+# Load a scenario
 curl -X POST <preview-url>/api/seed \
   -H "Content-Type: application/json" \
   -d '{"scenario": "with-test-user"}'
+
+# Reset to empty state
+curl -X DELETE <preview-url>/api/seed
 ```
+
+**Available scenarios:** `empty-repo`, `with-test-user`, `with-patterns`
+
+### QA Harness Limitations
+
+The current harness provides basic verification:
+- ✓ Health check (retries 3x with 10s delay)
+- ✓ Seed data injection
+- ✓ Page load without console errors
+- ✓ Screenshot capture on failure
+
+**Not yet implemented:**
+- ✗ Specific AC criteria validation (API response fields, UI elements)
+- ✗ Step-by-step execution from qa-checklist.md
+- ✗ Deep DOM assertions
+
+For thorough verification, manually test or extend `e2e/harness/qa-harness.ts`.
 
 ### Related Skills
 
