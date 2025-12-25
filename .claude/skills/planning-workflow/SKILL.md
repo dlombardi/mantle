@@ -41,11 +41,24 @@ Invoke when:
 
 2. **Analyze codebase** — read relevant skills, check existing patterns, identify file structure
 
-3. **Write plan.md** — use template from `references/plan-template.md`
+3. **Skill activation checklist** — explicitly identify required skills:
 
-4. **Review gate** — verify acceptance criteria, file paths, test strategy
+   | Question | If Yes → Activate |
+   |----------|-------------------|
+   | Does this involve API routes, tRPC, or backend services? | `api-backend` |
+   | Does this involve React components, state, or routing? | `frontend-architect` |
+   | Does this involve UI creation (pages, forms, visual elements)? | `frontend-design` (+ `frontend-architect`) |
+   | Does this require tests? | `testing-consultant` |
 
-5. **Transition to Phase 2**
+   > **Dual Activation Rule:** UI creation ALWAYS requires both `frontend-architect` (structure) AND `frontend-design` (aesthetics).
+
+   **Document activated skills in plan.md under "Skills Required" section.**
+
+4. **Write plan.md** — use template from `references/plan-template.md`
+
+5. **Review gate** — verify acceptance criteria, file paths, test strategy
+
+6. **Transition to Phase 2**
    ```bash
    bd update <bead-id> --status in_progress
    bd label add <bead-id> phase:building
