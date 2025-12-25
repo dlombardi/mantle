@@ -17,7 +17,7 @@ import { extractActionsFromSection, type Action } from './action-parser';
 import { executeActions, formatExecutionSummary } from './step-executor';
 
 export interface QAHarnessConfig {
-  /** Vercel preview deployment URL */
+  /** Vercel preview deployment URL (web app) */
   previewUrl: string;
   /** Path to qa-checklist.md artifact */
   checklistPath: string;
@@ -35,6 +35,8 @@ export interface QAHarnessConfig {
   skipSeed?: boolean;
   /** Vercel deployment protection bypass token */
   bypassToken?: string;
+  /** Separate API URL (e.g., Railway) - if not provided, uses previewUrl */
+  apiUrl?: string;
 }
 
 export interface VerificationResult {
@@ -136,11 +138,12 @@ export async function runQAHarness(config: QAHarnessConfig): Promise<QAHarnessRe
     }
 
     // Inject authenticated test session
-    const sessionAvailable = await isTestSessionAvailable(config.previewUrl, config.bypassToken);
+    const sessionOptions = { bypassToken: config.bypassToken, apiUrl: config.apiUrl };
+    const sessionAvailable = await isTestSessionAvailable(config.previewUrl, sessionOptions);
     if (sessionAvailable) {
       console.log('  Authenticating test session...');
       try {
-        const userEmail = await injectTestSession(page, config.previewUrl, config.bypassToken);
+        const userEmail = await injectTestSession(page, config.previewUrl, sessionOptions);
         console.log(`  Authenticated as: ${userEmail}\n`);
       } catch (authError) {
         console.warn(`  Auth warning: ${authError instanceof Error ? authError.message : String(authError)}`);

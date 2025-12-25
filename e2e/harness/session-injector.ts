@@ -35,10 +35,18 @@ interface TestSessionError {
 
 /**
  * Build the API URL for the test session endpoint
+ *
+ * @param previewUrl - The preview URL (web app)
+ * @param apiUrl - Optional separate API URL (e.g., Railway)
  */
-function getTestSessionUrl(previewUrl: string): string {
+function getTestSessionUrl(previewUrl: string, apiUrl?: string): string {
+  if (apiUrl) {
+    // Use separate API URL (e.g., Railway)
+    const url = new URL(apiUrl);
+    return `${url.origin}/api/test/session`;
+  }
+  // Fallback: API on same host as preview
   const url = new URL(previewUrl);
-  // API is at /api/test/session on the same host
   return `${url.origin}/api/test/session`;
 }
 
@@ -47,16 +55,19 @@ function getTestSessionUrl(previewUrl: string): string {
  *
  * @param page - Playwright page instance
  * @param previewUrl - The preview URL to authenticate against
- * @param bypassToken - Optional Vercel protection bypass token
+ * @param options - Configuration options
+ * @param options.bypassToken - Optional Vercel protection bypass token
+ * @param options.apiUrl - Optional separate API URL (e.g., Railway)
  * @returns The test user's email for logging
  * @throws Error if session creation or injection fails
  */
 export async function injectTestSession(
   page: Page,
   previewUrl: string,
-  bypassToken?: string,
+  options: { bypassToken?: string; apiUrl?: string } = {},
 ): Promise<string> {
-  const sessionUrl = getTestSessionUrl(previewUrl);
+  const { bypassToken, apiUrl } = options;
+  const sessionUrl = getTestSessionUrl(previewUrl, apiUrl);
 
   // Prepare headers for the API request
   const headers: Record<string, string> = {
@@ -117,14 +128,17 @@ export async function injectTestSession(
  * Check if the test session endpoint is available
  *
  * @param previewUrl - The preview URL to check
- * @param bypassToken - Optional Vercel protection bypass token
+ * @param options - Configuration options
+ * @param options.bypassToken - Optional Vercel protection bypass token
+ * @param options.apiUrl - Optional separate API URL (e.g., Railway)
  * @returns Whether the endpoint is available
  */
 export async function isTestSessionAvailable(
   previewUrl: string,
-  bypassToken?: string,
+  options: { bypassToken?: string; apiUrl?: string } = {},
 ): Promise<boolean> {
-  const sessionUrl = getTestSessionUrl(previewUrl);
+  const { bypassToken, apiUrl } = options;
+  const sessionUrl = getTestSessionUrl(previewUrl, apiUrl);
 
   const headers: Record<string, string> = {};
   if (bypassToken) {

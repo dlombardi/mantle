@@ -30,6 +30,7 @@ interface ParsedArgs {
   timeout: number;
   skipSeed: boolean;
   bypassToken?: string;
+  apiUrl?: string;
   help: boolean;
 }
 
@@ -41,6 +42,8 @@ function parseArgs(args: string[]): ParsedArgs {
     skipSeed: false,
     // Read bypass token from environment variable as default
     bypassToken: process.env.VERCEL_PROTECTION_BYPASS,
+    // Read API URL from environment variable as default (for split web/API deployments)
+    apiUrl: process.env.QA_API_URL,
     help: false,
   };
 
@@ -65,6 +68,8 @@ function parseArgs(args: string[]): ParsedArgs {
       result.timeout = parseInt(arg.slice('--timeout='.length), 10) || 300;
     } else if (arg.startsWith('--bypass-token=')) {
       result.bypassToken = arg.slice('--bypass-token='.length);
+    } else if (arg.startsWith('--api-url=')) {
+      result.apiUrl = arg.slice('--api-url='.length);
     }
   }
 
@@ -91,6 +96,8 @@ Optional:
   --skip-seed           Skip database seeding (for local testing)
   --bypass-token=<tok>  Vercel deployment protection bypass token
                         (or set VERCEL_PROTECTION_BYPASS env var)
+  --api-url=<url>       Separate API URL for split deployments (e.g., Railway)
+                        (or set QA_API_URL env var)
   --help, -h            Show this help message
 
 Examples:
@@ -155,6 +162,7 @@ async function main(): Promise<void> {
     timeout: args.timeout * 1000,
     skipSeed: args.skipSeed,
     bypassToken: args.bypassToken,
+    apiUrl: args.apiUrl,
   });
 
   // Exit with appropriate code
