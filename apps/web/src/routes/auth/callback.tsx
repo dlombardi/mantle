@@ -36,33 +36,46 @@ function AuthCallbackPage() {
       // Handle PKCE flow (code in query params)
       const code = params.get('code');
       if (code) {
-        const { error: exchangeError } =
-          await supabase.auth.exchangeCodeForSession(code);
-
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeError) {
           setError(exchangeError.message);
           return;
         }
+        navigate({ to: '/' });
+        return;
       }
 
       // Handle implicit flow (tokens in hash fragment)
-      // Supabase automatically detects and stores tokens from URL hash
-      // Just verify we have a session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = hashParams.get('access_token');
+      const refreshToken = hashParams.get('refresh_token');
 
-      if (sessionError) {
-        setError(sessionError.message);
+      if (accessToken && refreshToken) {
+        // Explicitly set the session from hash tokens
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (sessionError) {
+          setError(sessionError.message);
+          return;
+        }
+
+        // Clear the hash from URL for cleaner UX
+        window.history.replaceState(null, '', window.location.pathname);
+        navigate({ to: '/' });
         return;
       }
 
-      if (!session && !code) {
-        // No session and no code - something went wrong
-        setError('No authentication data received');
+      // Check if we already have a session (e.g., page refresh without hash)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        navigate({ to: '/' });
         return;
       }
 
-      // Redirect to home on success
-      navigate({ to: '/' });
+      // No auth data found
+      setError('No authentication data received');
     };
 
     handleCallback();
