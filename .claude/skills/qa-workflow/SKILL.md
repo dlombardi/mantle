@@ -1,5 +1,8 @@
 # QA Workflow
 
+> **Reference:** This skill implements Phase 3 of the Three-Phase Workflow defined in `CLAUDE.md`.
+> Read CLAUDE.md first for prerequisites, preview URL, bypass token setup, and full QA harness CLI reference.
+
 Phase 3 agent for the three-phase agentic coding workflow. Verifies implementation against acceptance criteria using the QA harness.
 
 ---
@@ -176,25 +179,38 @@ bd ready --label needs-human
 
 ## QA Harness Commands
 
+> **Full CLI reference:** See `CLAUDE.md` → "QA Harness Full Reference"
+
 ```bash
 # Full QA harness run
 bun run test:qa-harness -- \
   --preview-url=<url> \
-  --checklist=<path>
+  --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
+  --bead-id=<bead-id>
 
-# Just verify preview is up
-bun run test:qa-harness:health -- --preview-url=<url>
-
-# Just seed the preview
-bun run test:qa-harness:seed -- \
+# With bypass token (if not in .env.local)
+bun run test:qa-harness -- \
   --preview-url=<url> \
-  --scenario=<name>
+  --checklist=<path> \
+  --bead-id=<bead-id> \
+  --bypass-token=<token>
 
-# Just run verification (no seed)
-bun run test:qa-harness:verify -- \
+# Skip seeding for endpoints that don't need database
+bun run test:qa-harness -- \
   --preview-url=<url> \
-  --checklist=<path>
+  --checklist=<path> \
+  --bead-id=<bead-id> \
+  --skip-seed
+
+# Debug mode with visible browser
+bun run test:qa-harness -- \
+  --preview-url=<url> \
+  --checklist=<path> \
+  --bead-id=<bead-id> \
+  --headed
 ```
+
+**Environment:** The harness reads `VERCEL_PROTECTION_BYPASS` from `.env.local` automatically.
 
 ---
 

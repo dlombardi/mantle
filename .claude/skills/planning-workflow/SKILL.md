@@ -1,5 +1,8 @@
 # Planning Workflow
 
+> **Reference:** This skill implements Phase 1 of the Three-Phase Workflow defined in `CLAUDE.md`.
+> Read CLAUDE.md first for prerequisites and the complete workflow overview.
+
 Phase 1 agent for the three-phase agentic coding workflow. Creates implementation plans from beads and prepares work for Builder agents.
 
 ---
@@ -32,7 +35,13 @@ bd ready --json
 
 # Or show specific bead details
 bd show <bead-id>
+
+# CRITICAL: Sync immediately after picking a bead to prevent purge
+bd sync
 ```
+
+> ⚠️ **Bead Lifecycle Warning:** Always run `bd sync` immediately after picking a bead.
+> Without this, beads can be purged during subsequent sync operations.
 
 Extract from bead:
 - Title and description

@@ -1,5 +1,8 @@
 # Orchestrator Specialist
 
+> **Reference:** This skill coordinates the Three-Phase Workflow defined in `CLAUDE.md`.
+> Read CLAUDE.md first for prerequisites, preview URLs, bypass tokens, and QA harness CLI reference.
+
 Routes development tasks to appropriate specialist skills and manages work tracking with beads.
 
 ---
@@ -142,166 +145,57 @@ BEADS: #42
 
 ---
 
-## Three-Phase Agentic Workflow
+## Three-Phase Workflow Coordination
 
-For beads that require automated QA verification, use this workflow:
+> **Full workflow definition:** See `CLAUDE.md` → "Three-Phase Agentic Workflow"
+> This section describes the orchestrator's coordination role only.
 
 ```
 Phase 1: Planning     →  Phase 2: Implementation  →  Phase 3: Verification
 (planning-workflow)      (domain skills)             (qa-workflow)
 ```
 
-### Phase 1: Planning
+### Orchestrator Responsibilities by Phase
 
-**Trigger:** New bead or `bd ready`
-
-**Agent:** Load `planning-workflow` skill
-
-**Steps:**
-1. Pick bead from `bd ready`
-2. Analyze codebase for implementation approach
-3. Write `plan.md` artifact
-4. Review and approve plan
-
-**Output:**
-```
-.beads/artifacts/<bead-id>/plan.md
-```
-
-**Transition:**
-```bash
-bd update <bead-id> --status in_progress
-bd label add <bead-id> phase:building
-```
-
-### Phase 2: Implementation
-
-**Trigger:** Approved plan from Phase 1
-
-**Agent:** Domain skill (hono-specialist, frontend-architect, etc.)
-
-**Steps:**
-1. Read `plan.md`
-2. Implement code changes
-3. Write tests
-4. Push to trigger Vercel preview
-5. Write `qa-checklist.md`
-
-**Output:**
-```
-.beads/artifacts/<bead-id>/qa-checklist.md
-```
-
-**Transition:**
-```bash
-bd label add <bead-id> phase:verifying
-```
-
-### Phase 3: Verification
-
-**Trigger:** Implementation complete, preview deployed
-
-**Agent:** Spawn fresh `qa-workflow` via Task tool
-
-**Steps:**
-1. Read `qa-checklist.md`
-2. Run QA harness against preview
-3. Generate `qa-report.md`
-4. Determine pass/fail
-
-**Output:**
-```
-.beads/artifacts/<bead-id>/qa-report.md
-```
-
-**Exit Conditions:**
-| Outcome | Action |
-|---------|--------|
-| PASS | `bd close <id>`, add `qa:passed` |
-| FAIL (<3) | Loop to Phase 2 |
-| FAIL (=3) | Add `needs-human`, escalate |
+| Transition | Orchestrator Action |
+|------------|---------------------|
+| Start → Phase 1 | Route bead to `planning-workflow` |
+| Phase 1 → 2 | Route `plan.md` to appropriate domain skill |
+| Phase 2 → 3 | Spawn fresh QA agent via Task tool |
+| Phase 3 → 2 | On failure, route `qa-report.md` back to builder |
+| Phase 3 → Done | On pass, close bead with `qa:passed` |
 
 ### Spawning QA Agent (Fresh Context)
 
+Phase 3 **must** run in a fresh subprocess to prevent context bleed:
+
 ```typescript
-// Use Task tool to spawn QA with isolated context
 Task({
-  subagent_type: 'Explore',  // Or custom qa-workflow type
+  subagent_type: 'Explore',
   prompt: `
     FRESH CONTEXT - You are the QA agent for Phase 3.
 
     Bead: ${beadId}
-    Preview URL: ${previewUrl}
+    Preview URL: https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app
     Iteration: ${iteration}/3
 
-    1. Read .beads/artifacts/${beadId}/qa-checklist.md
-    2. Run QA harness: bun run test:qa-harness --preview-url=${previewUrl}
-    3. Write results to .beads/artifacts/${beadId}/qa-report.md
-
-    Load the qa-workflow skill for detailed instructions.
+    1. Load the qa-workflow skill
+    2. Read .beads/artifacts/${beadId}/qa-checklist.md
+    3. Run QA harness (see CLAUDE.md for full CLI options)
+    4. Write results to .beads/artifacts/${beadId}/qa-report.md
   `
 })
 ```
 
-### Artifact Flow
+### Routing After QA Failure
+
+When QA fails and iteration < 3, hand back to the original builder skill:
 
 ```
-Phase 1                    Phase 2                    Phase 3
-────────                   ────────                   ────────
-plan.md ──────────────────→ (reads)
-                           qa-checklist.md ──────────→ (reads)
-                                                      qa-report.md
-                           ←─────────────────────────── (on failure)
-```
-
-### Label Conventions
-
-```bash
-# Phase tracking
-bd label add <id> phase:planning
-bd label add <id> phase:building
-bd label add <id> phase:verifying
-
-# Iteration tracking
-bd label add <id> qa:iteration-1
-bd label add <id> qa:iteration-2
-bd label add <id> qa:iteration-3
-
-# Outcomes
-bd label add <id> qa:passed
-bd label add <id> needs-human
-```
-
-### Example: Full Workflow
-
-```bash
-# Phase 1: Planning
-bd ready                                    # Find work
-bd update bd-a1b2 --status in_progress
-# Planner creates .beads/artifacts/bd-a1b2/plan.md
-bd label add bd-a1b2 phase:building
-
-# Phase 2: Implementation
-# Builder reads plan.md, writes code
-# Builder writes .beads/artifacts/bd-a1b2/qa-checklist.md
-git push                                    # Triggers Vercel preview
-bd label add bd-a1b2 phase:verifying
-
-# Phase 3: Verification (spawned as fresh session)
-# QA reads qa-checklist.md
-# QA runs harness against preview
-# QA writes .beads/artifacts/bd-a1b2/qa-report.md
-
-# If PASS:
-bd close bd-a1b2 --reason "QA passed"
-bd label add bd-a1b2 qa:passed
-
-# If FAIL (iteration < 3):
-bd update bd-a1b2 --note "QA iteration 1 failed - see qa-report.md"
-bd label add bd-a1b2 qa:iteration-1
-# Loop back to Phase 2
-
-# If FAIL (iteration = 3):
-bd label add bd-a1b2 needs-human
-bd update bd-a1b2 --note "Max iterations reached, escalating"
+HANDOFF TO: <original-domain-skill>
+PHASE: 2 (Implementation - Iteration N+1)
+BEAD: <bead-id>
+CONTEXT: QA failed, see qa-report.md for issues
+TASK: Fix issues identified in report, update qa-checklist.md
+FILES: .beads/artifacts/<bead-id>/qa-report.md
 ```
