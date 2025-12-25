@@ -45,11 +45,19 @@ export function createTrpcClient() {
       httpBatchLink({
         url: '/api/trpc',
         transformer: superjson,
-        headers: () => {
-          // Get auth token from Supabase session if available
-          // This will be enhanced when auth is implemented
-          const token = localStorage.getItem('supabase.auth.token');
-          return token ? { Authorization: `Bearer ${token}` } : {};
+        headers: async () => {
+          // Get auth token from Supabase session
+          try {
+            const { getSupabaseClient } = await import('./supabase');
+            const supabase = getSupabaseClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.access_token) {
+              return { Authorization: `Bearer ${session.access_token}` };
+            }
+          } catch {
+            // Supabase not available or session error
+          }
+          return {};
         },
       }),
     ],

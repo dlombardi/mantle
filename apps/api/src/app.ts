@@ -14,11 +14,53 @@ import { HTTPException } from 'hono/http-exception';
 import { trpcServer } from '@hono/trpc-server';
 import { ZodError } from 'zod';
 import { getDb } from './lib/db';
+import { getSupabaseClient } from './lib/supabase/client';
 import { healthRoutes } from './routes/health';
 import { exampleRoutes } from './routes/example';
 import { seedRoutes } from './routes/seed';
 import { testSessionRoutes } from './routes/test-session';
-import { appRouter, createContext } from '@mantle/trpc';
+import { appRouter, createContext, type User } from '@mantle/trpc';
+
+/**
+ * Extract user from Authorization header JWT.
+ * Uses Supabase to validate the token and get user info.
+ */
+async function extractUserFromRequest(req: Request): Promise<User | null> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+
+  const token = authHeader.slice(7); // Remove 'Bearer ' prefix
+
+  try {
+    const supabase = getSupabaseClient();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return null;
+    }
+
+    // Extract GitHub info from user metadata
+    const githubId = user.user_metadata?.provider_id
+      ? Number(user.user_metadata.provider_id)
+      : null;
+    const githubUsername = user.user_metadata?.user_name ?? null;
+
+    if (!githubId || !githubUsername) {
+      // User doesn't have GitHub metadata - might be logged in differently
+      return null;
+    }
+
+    return {
+      id: user.id,
+      githubId,
+      githubUsername,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Create and configure the Hono application.
@@ -74,8 +116,7 @@ export function createApp(options: { enableLogger?: boolean } = {}) {
         return createContext({
           req,
           getDb,
-          // TODO: Add user extraction from JWT
-          getUser: async () => null,
+          getUser: async () => extractUserFromRequest(req),
         });
       },
     }),
