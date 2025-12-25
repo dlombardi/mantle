@@ -39,11 +39,24 @@ export const trpc = createTRPCReact<AppRouter>();
  * - superjson: Preserves Date objects and other JavaScript types
  * - Auth header: Injects Supabase token when available
  */
+/**
+ * Get the tRPC API URL.
+ * Uses VITE_API_URL for split deployments (Vercel + Railway),
+ * falls back to relative path for same-origin deployments.
+ */
+function getTrpcUrl(): string {
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl) {
+    return `${apiUrl}/api/trpc`;
+  }
+  return '/api/trpc';
+}
+
 export function createTrpcClient() {
   return trpc.createClient({
     links: [
       httpBatchLink({
-        url: '/api/trpc',
+        url: getTrpcUrl(),
         transformer: superjson,
         headers: async () => {
           // Get auth token from Supabase session
