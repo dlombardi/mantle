@@ -148,5 +148,3 @@
 {"id":"mantle-c42","ts":"2025-12-24T02:20:04.648045Z","by":"darienlombardi","reason":"manual delete"}
 {"id":"mantle-scp","ts":"2025-12-24T02:20:04.730495Z","by":"darienlombardi","reason":"manual delete"}
 {"id":"mantle-ayy","ts":"2025-12-24T02:20:04.813917Z","by":"darienlombardi","reason":"manual delete"}
-{"id":"mantle-m9d","ts":"2025-12-24T23:21:54.864019Z","by":"git-history-backfill","reason":"recovered from git history (pruned from manifest)"}
-{"id":"mantle-b5z","ts":"2025-12-24T23:55:47.782018Z","by":"git-history-backfill","reason":"recovered from git history (pruned from manifest)"}
