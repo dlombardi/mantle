@@ -408,10 +408,20 @@ Before running the workflow, ensure:
 
 1. **Vercel preview environment** is configured (auto-deploys on push)
 2. **Railway preview environment** exists with `VERCEL_ENV=preview`
-3. **Supabase preview branch** exists with current schema
-4. **Bypass token** is set in `.env.local` (see Vercel Preview Access below)
+3. **Supabase configuration aligned** - Railway and Vercel must use the SAME Supabase project
+4. **Supabase redirect URLs** include the preview domain in Authentication → URL Configuration
+5. **Bypass token** is set in `.env.local` (see Vercel Preview Access below)
 
 See `docs/preview-environment-setup.md` for full setup instructions.
+
+### Stable Preview URLs
+
+| Service | URL |
+|---------|-----|
+| **Web (Vercel)** | `https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app` |
+| **API (Railway)** | `https://mantleapi-preview.up.railway.app` |
+
+These URLs are stable for the `preview` branch. Feature branches get unique URLs.
 
 ### Phase 1: Planning
 
@@ -547,9 +557,10 @@ bd label add <id> needs-human
 
 ```bash
 bun run test:qa-harness -- \
-  --preview-url=<url>              # Required: Vercel preview URL
+  --preview-url=<url>              # Required: Vercel preview URL (web app)
   --checklist=<path>               # Required: Path to qa-checklist.md
   --bead-id=<id>                   # Required: Bead ID for artifact output
+  --api-url=<url>                  # Railway API URL (for split deployments)
   --bypass-token=<token>           # Vercel protection bypass (or use VERCEL_PROTECTION_BYPASS env)
   --skip-seed                      # Skip database seeding (for DB-free endpoints)
   --headed                         # Run browser visibly (for debugging)
@@ -557,30 +568,44 @@ bun run test:qa-harness -- \
   --timeout=<seconds>              # Timeout in seconds (default: 300)
 ```
 
+**Environment variables (alternative to CLI flags):**
+- `VERCEL_PROTECTION_BYPASS` - Bypass token for Vercel deployment protection
+- `QA_API_URL` - Railway API URL (alternative to `--api-url`)
+
 **Examples:**
 
 ```bash
+# Standard run against preview (split web/API deployment)
+bun run test:qa-harness -- \
+  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
+  --api-url=https://mantleapi-preview.up.railway.app \
+  --checklist=.beads/artifacts/bead-001/qa-checklist.md \
+  --bead-id=bead-001 \
+  --skip-seed
+
 # Full run with seeding
 bun run test:qa-harness -- \
-  --preview-url=https://mantle-git-preview-team.vercel.app \
+  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
+  --api-url=https://mantleapi-preview.up.railway.app \
   --checklist=.beads/artifacts/bead-001/qa-checklist.md \
   --bead-id=bead-001
 
-# Skip seeding for endpoints that don't need database
-bun run test:qa-harness -- \
-  --preview-url=https://mantle-git-preview-team.vercel.app \
-  --checklist=.beads/artifacts/bead-002/qa-checklist.md \
-  --bead-id=bead-002 \
-  --skip-seed
-
 # Debug mode with visible browser
 bun run test:qa-harness -- \
-  --preview-url=http://localhost:3000 \
+  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
+  --api-url=https://mantleapi-preview.up.railway.app \
   --checklist=.beads/artifacts/bead-003/qa-checklist.md \
   --bead-id=bead-003 \
   --headed \
   --skip-seed
 ```
+
+**How authentication works:** The QA harness automatically authenticates by:
+1. Calling `POST /api/test/session` on the API to create a test user session
+2. Injecting the session tokens into browser localStorage
+3. Reloading the page to pick up the authenticated state
+
+This enables testing authenticated flows without manual OAuth.
 
 ### Seed API Reference
 

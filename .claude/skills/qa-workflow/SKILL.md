@@ -53,6 +53,16 @@ Task({
 
 ---
 
+## Split Deployment Architecture
+
+This project uses split deployments:
+- **Web (Vercel):** `https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app`
+- **API (Railway):** `https://mantleapi-preview.up.railway.app`
+
+The QA harness needs BOTH URLs to function correctly.
+
+---
+
 ## Workflow Protocol
 
 ### Step 1: Load QA Checklist
@@ -71,27 +81,35 @@ The checklist contains:
 ### Step 2: Prepare Environment
 
 ```bash
-# Verify preview is accessible
-curl -I <preview-url>/api/health/live
+# Verify web preview is accessible
+curl -I https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app/api/health/live
 
-# Seed the preview with test data
-curl -X POST <preview-url>/api/seed \
+# Verify API is accessible
+curl -I https://mantleapi-preview.up.railway.app/api/health/live
+
+# (Optional) Seed the preview with test data - harness does this automatically
+curl -X POST https://mantleapi-preview.up.railway.app/api/seed \
   -H "Content-Type: application/json" \
   -d '{"scenario": "<scenario-name>"}'
 ```
 
 ### Step 3: Run QA Harness
 
-Execute the QA harness script:
+Execute the QA harness script with BOTH URLs:
 ```bash
 bun run test:qa-harness -- \
-  --preview-url=<preview-url> \
-  --checklist=.beads/artifacts/<bead-id>/qa-checklist.md
+  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
+  --api-url=https://mantleapi-preview.up.railway.app \
+  --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
+  --bead-id=<bead-id> \
+  --skip-seed
 ```
 
+**Why `--api-url`?** The test session endpoint (`/api/test/session`) lives on Railway, not Vercel.
+
 The harness will:
-1. Reset and seed the preview environment
-2. Capture application logs
+1. Authenticate via test session injection (no manual OAuth needed)
+2. Reset and seed the preview environment (if not skipped)
 3. Run browser-based verification (Playwright)
 4. Generate structured results
 
@@ -182,35 +200,40 @@ bd ready --label needs-human
 > **Full CLI reference:** See `CLAUDE.md` → "QA Harness Full Reference"
 
 ```bash
-# Full QA harness run
+# Standard run against preview (RECOMMENDED)
 bun run test:qa-harness -- \
-  --preview-url=<url> \
+  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
+  --api-url=https://mantleapi-preview.up.railway.app \
   --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
-  --bead-id=<bead-id>
-
-# With bypass token (if not in .env.local)
-bun run test:qa-harness -- \
-  --preview-url=<url> \
-  --checklist=<path> \
-  --bead-id=<bead-id> \
-  --bypass-token=<token>
-
-# Skip seeding for endpoints that don't need database
-bun run test:qa-harness -- \
-  --preview-url=<url> \
-  --checklist=<path> \
   --bead-id=<bead-id> \
   --skip-seed
 
+# With seeding (if checklist requires test data)
+bun run test:qa-harness -- \
+  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
+  --api-url=https://mantleapi-preview.up.railway.app \
+  --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
+  --bead-id=<bead-id>
+
 # Debug mode with visible browser
 bun run test:qa-harness -- \
-  --preview-url=<url> \
-  --checklist=<path> \
+  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
+  --api-url=https://mantleapi-preview.up.railway.app \
+  --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
   --bead-id=<bead-id> \
-  --headed
+  --headed \
+  --skip-seed
 ```
 
-**Environment:** The harness reads `VERCEL_PROTECTION_BYPASS` from `.env.local` automatically.
+**Environment variables (read from `.env.local`):**
+- `VERCEL_PROTECTION_BYPASS` - Bypass token for Vercel deployment protection
+- `QA_API_URL` - Alternative to `--api-url` flag
+
+**How authentication works:** The harness automatically:
+1. Calls `POST /api/test/session` on the Railway API
+2. Creates a test user session via Supabase Admin API
+3. Injects session tokens into browser localStorage
+4. Tests run as authenticated user (no manual OAuth needed)
 
 ---
 
