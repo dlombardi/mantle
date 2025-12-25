@@ -472,27 +472,13 @@ bd label add <bead-id> phase:verifying
 
 ### Vercel Preview Access
 
-Preview deployments require authentication bypass:
+Preview deployments require `VERCEL_PROTECTION_BYPASS` in `.env.local`. The QA harness reads this automatically.
 
-```bash
-# 1. Get bypass token from Vercel Dashboard:
-#    Project Settings → Deployment Protection → Protection Bypass → Generate
+### Preview URL
 
-# 2. Add to .env.local (already in .env.local.example):
-VERCEL_PROTECTION_BYPASS=<your-token>
+**Stable preview URL:** `https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app`
 
-# 3. QA harness reads this automatically, or pass explicitly:
---bypass-token=<token>
-```
-
-### Preview URL Patterns
-
-| Branch | URL Pattern |
-|--------|-------------|
-| `preview` (stable) | `https://mantle-git-preview-<vercel-team>.vercel.app` |
-| Feature branches | `https://mantle-git-<branch>-<vercel-team>.vercel.app` |
-
-**Discovery:** Run `vercel ls mantle` or check Vercel dashboard.
+Feature branches deploy to: `https://mantle-git-<branch>-darienlombardi-2455s-projects.vercel.app`
 
 ### Artifact Storage
 
@@ -593,21 +579,6 @@ curl -X DELETE <preview-url>/api/seed
 ```
 
 **Available scenarios:** `empty-repo`, `with-test-user`, `with-patterns`
-
-### QA Harness Limitations
-
-The current harness provides basic verification:
-- ✓ Health check (retries 3x with 10s delay)
-- ✓ Seed data injection
-- ✓ Page load without console errors
-- ✓ Screenshot capture on failure
-
-**Not yet implemented:**
-- ✗ Specific AC criteria validation (API response fields, UI elements)
-- ✗ Step-by-step execution from qa-checklist.md
-- ✗ Deep DOM assertions
-
-For thorough verification, manually test or extend `e2e/harness/qa-harness.ts`.
 
 ### Related Skills
 
