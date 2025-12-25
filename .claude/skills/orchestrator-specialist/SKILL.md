@@ -1,9 +1,6 @@
 # Orchestrator Specialist
 
-> **Reference:** This skill coordinates the Three-Phase Workflow defined in `CLAUDE.md`.
-> Read CLAUDE.md first for prerequisites, preview URLs, bypass tokens, and QA harness CLI reference.
-
-Routes development tasks to appropriate specialist skills and manages work tracking with beads.
+Routes development tasks to specialist skills and manages work tracking with beads. This is the **canonical source** for the Three-Phase Workflow.
 
 ---
 
@@ -30,20 +27,14 @@ Invoke this skill when:
 ```
 User Request
     │
-    ├─ Contains "route", "middleware", "handler", "API"?
-    │   └── hono-specialist
+    ├─ Contains "route", "middleware", "handler", "API", "tRPC", "service", "job", "drizzle"?
+    │   └── api-backend
     │
     ├─ Contains "component", "UI", "state", "hook", "React"?
     │   └── frontend-architect
     │
     ├─ Contains "test", "mock", "fixture", "coverage"?
     │   └── testing-consultant
-    │
-    ├─ Contains "service", "job", "error", "repository"?
-    │   └── backend-architect
-    │
-    ├─ Contains "config", "eslint", "drizzle", "migration", "tooling"?
-    │   └── foundation-specialist
     │
     └─ Unclear?
         └── Ask clarifying question before routing
@@ -66,30 +57,21 @@ BEADS: <active bead ID if any>
 
 ### Example: "Add new API endpoint with validation and tests"
 
-**Step 1 - Route to hono-specialist:**
+**Step 1 - Route to api-backend:**
 ```
-HANDOFF TO: hono-specialist
+HANDOFF TO: api-backend
 CONTEXT: New endpoint needed for user preferences
-TASK: Create POST /api/preferences route with Zod validation
-FILES: apps/api/src/routes/index.ts
+TASK: Create tRPC procedure or REST route with Zod validation
+FILES: packages/trpc/src/routers/, apps/api/src/routes/
 BEADS: #42
 ```
 
 **Step 2 - Route to testing-consultant:**
 ```
 HANDOFF TO: testing-consultant
-CONTEXT: Preferences endpoint created at apps/api/src/routes/preferences.ts
+CONTEXT: Preferences endpoint created
 TASK: Write unit tests for happy path and validation errors
-FILES: apps/api/src/routes/preferences.ts
-BEADS: #42
-```
-
-**Step 3 - Route to backend-architect:**
-```
-HANDOFF TO: backend-architect
-CONTEXT: Endpoint and tests complete
-TASK: Review error handling, add to service layer if needed
-FILES: apps/api/src/routes/preferences.ts, apps/api/src/routes/preferences.test.ts
+FILES: packages/trpc/src/routers/preferences.test.ts
 BEADS: #42
 ```
 
@@ -99,11 +81,9 @@ BEADS: #42
 
 | Skill | Expertise | Key Files |
 |-------|-----------|-----------|
-| `hono-specialist` | Hono routes, middleware, validation | `apps/api/src/routes/` |
+| `api-backend` | tRPC routers, Hono REST, Drizzle, services, jobs | `packages/trpc/`, `apps/api/src/` |
 | `frontend-architect` | React components, state, routing | `apps/web/src/` |
 | `testing-consultant` | Vitest, Playwright, mocks, coverage | `**/*.test.ts`, `e2e/` |
-| `backend-architect` | Services, Drizzle ORM, jobs | `apps/api/src/lib/db/`, `apps/api/src/services/` |
-| `foundation-specialist` | Config, migrations, tooling | `*.config.*`, `supabase/migrations/` |
 
 ---
 
@@ -145,15 +125,28 @@ BEADS: #42
 
 ---
 
-## Three-Phase Workflow Coordination
+## Three-Phase Workflow (Canonical)
 
-> **Full workflow definition:** See `CLAUDE.md` → "Three-Phase Agentic Workflow"
-> This section describes the orchestrator's coordination role only.
+This is the authoritative definition of the three-phase workflow.
 
 ```
 Phase 1: Planning     →  Phase 2: Implementation  →  Phase 3: Verification
 (planning-workflow)      (domain skills)             (qa-workflow)
 ```
+
+### Preview URLs
+
+| Service | URL |
+|---------|-----|
+| **Web (Vercel)** | `https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app` |
+| **API (Railway)** | `https://mantleapi-preview.up.railway.app` |
+
+### Prerequisites
+
+1. Vercel preview configured (auto-deploys on push)
+2. Railway preview with `VERCEL_ENV=preview`
+3. `VERCEL_PROTECTION_BYPASS` token in `.env.local`
+4. Supabase redirect URLs include preview domain
 
 ### Orchestrator Responsibilities by Phase
 
@@ -181,7 +174,7 @@ Task({
 
     1. Load the qa-workflow skill
     2. Read .beads/artifacts/${beadId}/qa-checklist.md
-    3. Run QA harness (see CLAUDE.md for full CLI options)
+    3. Run QA harness (see qa-workflow/SKILL.md for CLI reference)
     4. Write results to .beads/artifacts/${beadId}/qa-report.md
   `
 })

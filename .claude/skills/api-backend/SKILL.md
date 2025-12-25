@@ -1,33 +1,31 @@
-# Backend Architect
+# API Backend
 
-Establishes backend architecture patterns: tRPC router design, error handling, Drizzle ORM database access, background jobs, and service layer conventions.
+Backend architecture: tRPC routers, Hono REST routes, Drizzle ORM, error handling, and background jobs.
+
+> **Note:** For general framework documentation, use the Ref MCP server.
+> This skill covers project-specific conventions only.
 
 ---
 
 ## Activation
 
 Invoke this skill when working on:
-- API endpoint design and implementation
-- Error handling patterns and error classes
-- Service layer architecture
-- Background job patterns (Trigger.dev)
-- Database query patterns with Drizzle ORM
-- External API integration (GitHub, Anthropic)
+- tRPC router procedures (most business logic)
+- REST routes (health checks, webhooks only)
+- Database queries with Drizzle ORM
+- Error handling and error classes
+- Background jobs (Trigger.dev)
+- Service layer patterns
 
-**Trigger keywords:** `service`, `job`, `trigger`, `error`, `repository`, `API design`
-
-**Example triggers:**
-- "Create a service to handle pattern promotion"
-- "Add error handling for the GitHub API calls"
-- "Implement a background job for repo ingestion"
-- "Design the API for user preferences"
-- "Add retry logic with exponential backoff"
+**Trigger keywords:** `route`, `middleware`, `handler`, `tRPC`, `procedure`, `service`, `job`, `drizzle`, `query`
 
 **Key files:**
-- `apps/api/src/services/`
-- `apps/api/src/jobs/`
-- `apps/api/src/lib/errors/`
-- `apps/api/src/lib/db/`
+- `packages/trpc/src/routers/` — tRPC routers
+- `apps/api/src/routes/` — REST routes (health, webhooks)
+- `apps/api/src/index.ts` — App entry, tRPC mount
+- `apps/api/src/lib/db/` — Drizzle ORM
+- `apps/api/src/services/` — Service layer
+- `apps/api/src/jobs/` — Trigger.dev jobs
 
 ---
 
@@ -35,8 +33,8 @@ Invoke this skill when working on:
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| Runtime | Bun | Fast JS runtime |
-| Framework | Hono | Lightweight web framework |
+| Runtime | Bun 1.3.0 | Fast JS runtime |
+| Framework | Hono 4.6.14 | Lightweight web framework |
 | API | tRPC + @trpc/server | Type-safe API layer |
 | ORM | Drizzle | Type-safe database queries |
 | Validation | Zod | Runtime validation (tRPC input) |
@@ -45,10 +43,57 @@ Invoke this skill when working on:
 
 ---
 
+## REST vs tRPC Decision
+
+| Route | Protocol | Reason |
+|-------|----------|--------|
+| `/trpc/*` | tRPC | Business logic, type-safe |
+| `/health/*` | REST | Kubernetes probes |
+| `/github/webhooks` | REST | GitHub signature verification |
+
+**Rule:** Use tRPC for all business logic. REST is only for infrastructure endpoints and external webhooks.
+
+---
+
+## tRPC Middleware Mount
+
+```typescript
+// apps/api/src/index.ts
+import { Hono } from 'hono';
+import { trpcServer } from '@hono/trpc-server';
+import { appRouter, createContext } from '@mantle/trpc';
+import { healthRoutes } from './routes/health';
+import { getDb } from './lib/db/client';
+
+const app = new Hono();
+
+// tRPC for business logic
+app.use(
+  '/trpc/*',
+  trpcServer({
+    router: appRouter,
+    endpoint: '/api/trpc',
+    createContext: async ({ req }) => {
+      return createContext({
+        req,
+        getDb,
+        getUser: async () => extractUserFromRequest(req),
+      });
+    },
+  }),
+);
+
+// REST routes for infrastructure
+app.route('/health', healthRoutes);
+
+export default app;
+```
+
+---
+
 ## tRPC Router Patterns
 
 ### Router Structure
-tRPC routers live in `packages/trpc/src/routers/` and are merged into the main appRouter.
 
 ```typescript
 // packages/trpc/src/routers/patterns.router.ts
@@ -72,45 +117,31 @@ export const patternsRouter = router({
       });
       return { items: patterns, page: input.page, limit: input.limit };
     }),
-
-  updateStatus: protectedProcedure
-    .input(z.object({
-      id: z.string().uuid(),
-      status: z.enum(['authoritative', 'rejected', 'deferred']),
-      rationale: z.string().max(1000).optional(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const { id, status, rationale } = input;
-      const [updated] = await ctx.db.update(patterns)
-        .set({ status, rationale, validatedBy: ctx.user.id })
-        .where(eq(patterns.id, id))
-        .returning();
-      return { success: true, pattern: updated };
-    }),
 });
 ```
 
 ### Procedure Types
+
 ```typescript
 // publicProcedure - No auth required (health checks)
 // protectedProcedure - Requires authenticated user in context
 ```
 
-### tRPC Namespace Convention
+### Namespace Convention
+
 ```
 trpc.repos.list            # List repositories
 trpc.repos.getById         # Get single repo
 trpc.repos.connect         # Connect new repo
 trpc.patterns.list         # List patterns
 trpc.patterns.updateStatus # Update pattern status
-trpc.patterns.addEvidence  # Add evidence to pattern
 ```
 
 ### Error Handling in Procedures
+
 ```typescript
 import { TRPCError } from '@trpc/server';
 
-// In a procedure
 if (!pattern) {
   throw new TRPCError({
     code: 'NOT_FOUND',
@@ -126,11 +157,15 @@ if (pattern.repo.userId !== ctx.user.id) {
 }
 ```
 
+For tRPC patterns not covered here, use Ref:
+```
+ref_search_documentation("tRPC [pattern name]")
+```
+
 ---
 
-## Error Handling
+## Error Class Hierarchy
 
-### Error Class Hierarchy
 ```typescript
 // lib/errors/base.ts
 export class AppError extends Error {
@@ -164,49 +199,38 @@ export class UnauthorizedError extends AppError {
 }
 ```
 
-### Error Middleware
-```typescript
-// middleware/error-handler.ts
-import { Context, Next } from 'hono';
-import { AppError } from '@/lib/errors/base';
+---
 
-export async function errorHandler(c: Context, next: Next) {
-  try {
-    await next();
-  } catch (err) {
-    if (err instanceof AppError) {
-      return c.json({
-        data: null,
-        error: { code: err.code, message: err.message },
-      }, err.statusCode);
-    }
-    console.error('Unhandled error:', err);
-    return c.json({
-      data: null,
-      error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
-    }, 500);
-  }
-}
+## Response Envelope (REST routes)
+
+```typescript
+// Success
+return c.json({ data: result, error: null });
+
+// Error
+return c.json({
+  data: null,
+  error: { code: 'NOT_FOUND', message: 'Pattern not found' },
+}, 404);
+
+// With metadata
+return c.json({
+  data: patterns,
+  error: null,
+  meta: { page: 1, pageSize: 20, total: 100 },
+});
 ```
 
 ---
 
-## Database Access with Drizzle
+## Database Access (Drizzle)
 
-### Getting the Database Client
 ```typescript
 import { getDb } from '@/lib/db/client';
-
-const db = getDb();
-```
-
-### Basic Queries
-```typescript
 import { eq, and } from 'drizzle-orm';
 import { patterns } from '@/lib/db/schema';
 
-// Select all
-const allPatterns = await db.select().from(patterns);
+const db = getDb();
 
 // Select with filter
 const repoPatterns = await db
@@ -214,82 +238,35 @@ const repoPatterns = await db
   .from(patterns)
   .where(eq(patterns.repoId, repoId));
 
-// Select with multiple conditions
-const candidates = await db
-  .select()
-  .from(patterns)
-  .where(and(
-    eq(patterns.repoId, repoId),
-    eq(patterns.status, 'candidate')
-  ));
-```
-
-### Insert Operations
-```typescript
+// Insert with returning
 const [newPattern] = await db
   .insert(patterns)
-  .values({
-    repoId,
-    name: 'New Pattern',
-    description: 'Description',
-    type: 'code',
-    extractedByModel: 'claude-sonnet-4-5-20250929',
-  })
+  .values({ repoId, name: 'New Pattern', type: 'code' })
   .returning();
-```
 
-### Update Operations
-```typescript
+// Update with returning
 const [updated] = await db
   .update(patterns)
-  .set({
-    status: 'authoritative',
-    validatedAt: new Date(),
-    validatedBy: userId,
-  })
+  .set({ status: 'authoritative', validatedAt: new Date() })
   .where(eq(patterns.id, patternId))
   .returning();
-```
 
-### Queries with Relations
-```typescript
-// Using Drizzle's relational queries
+// Relational queries
 const patternWithEvidence = await db.query.patterns.findFirst({
   where: eq(patterns.id, patternId),
-  with: {
-    evidence: true,
-    repo: true,
-  },
+  with: { evidence: true, repo: true },
 });
 ```
 
-### Typed Query Helpers
-```typescript
-// lib/db/queries/patterns.ts
-import { getDb } from '../client';
-import { patterns } from '../schema';
-import { eq, and } from 'drizzle-orm';
-
-export async function getPatternsByRepo(
-  repoId: string,
-  filters?: { status?: string }
-) {
-  const db = getDb();
-  let conditions = [eq(patterns.repoId, repoId)];
-
-  if (filters?.status) {
-    conditions.push(eq(patterns.status, filters.status));
-  }
-
-  return db.select().from(patterns).where(and(...conditions));
-}
+For Drizzle patterns not covered here, use Ref:
+```
+ref_search_documentation("Drizzle ORM [pattern name]")
 ```
 
 ---
 
-## Background Job Patterns
+## Background Jobs (Trigger.dev)
 
-### Job Structure (Trigger.dev)
 ```typescript
 // jobs/ingest-repo.ts
 import { task } from '@trigger.dev/sdk/v3';
@@ -329,7 +306,7 @@ export const ingestRepoJob = task({
 });
 ```
 
-### Job Requirements
+**Job Requirements:**
 - **Idempotency**: Always check if work is already done
 - **Status tracking**: Update database status at each stage
 - **Error handling**: Jobs should surface errors, not swallow them
@@ -337,16 +314,14 @@ export const ingestRepoJob = task({
 
 ---
 
-## Service Layer Patterns
+## Service Layer
 
-### Layer Responsibilities
 ```
 Route handlers → validate input, call service, format response
 Services       → business logic, orchestration, cross-cutting concerns
 DB queries     → data access via Drizzle, no business logic
 ```
 
-### Service Function Pattern
 ```typescript
 // services/patterns.ts
 import { getDb } from '@/lib/db/client';
@@ -367,10 +342,7 @@ export async function promotePattern(
     with: { repo: true },
   });
 
-  if (!pattern) {
-    throw new NotFoundError('Pattern', patternId);
-  }
-
+  if (!pattern) throw new NotFoundError('Pattern', patternId);
   if (pattern.repo.userId !== userId) {
     throw new UnauthorizedError('Not authorized to modify this pattern');
   }
@@ -387,7 +359,7 @@ export async function promotePattern(
     .where(eq(patterns.id, patternId))
     .returning();
 
-  // 3. Trigger side effects (background jobs)
+  // 3. Trigger side effects
   await ingestRepoJob.trigger({ repoId: pattern.repoId });
 
   return updated;
@@ -396,9 +368,9 @@ export async function promotePattern(
 
 ---
 
-## Supabase Client (Auth/Realtime Only)
+## Supabase Client Note
 
-The Supabase client is for auth, storage, and realtime features only. **Do not use it for database queries** - use Drizzle ORM instead.
+The Supabase client is for auth, storage, and realtime only. **Do not use it for database queries** - use Drizzle ORM instead.
 
 ```typescript
 import { getSupabaseClient } from '@/lib/supabase/client';
@@ -409,59 +381,6 @@ const { data: { user } } = await supabase.auth.getUser(token);
 
 // Storage operations
 await supabase.storage.from('diffs').upload(path, content);
-
-// Realtime subscriptions (client-side)
-supabase.channel('repos').on('postgres_changes', callback);
-```
-
----
-
-## Input Validation with Zod
-
-### tRPC Input Validation
-Zod schemas are defined inline in procedure `.input()` calls:
-
-```typescript
-import { z } from 'zod';
-
-export const patternsRouter = router({
-  create: protectedProcedure
-    .input(z.object({
-      name: z.string().min(1, 'Name is required'),
-      description: z.string().min(1),
-      type: z.enum(['code', 'filesystem']),
-      repoId: z.string().uuid(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      // input is fully typed: { name: string; description: string; ... }
-      const [pattern] = await ctx.db.insert(patterns).values(input).returning();
-      return pattern;
-    }),
-});
-```
-
-### Reusable Schemas
-For complex or shared validation, define schemas separately:
-
-```typescript
-// packages/trpc/src/schemas/pattern.ts
-export const patternStatusSchema = z.enum([
-  'candidate',
-  'authoritative',
-  'rejected',
-  'deferred',
-]);
-
-export const paginationSchema = z.object({
-  page: z.number().int().positive().default(1),
-  limit: z.number().int().positive().max(100).default(20),
-});
-
-// In router
-.input(paginationSchema.extend({
-  repoId: z.string().uuid(),
-  status: patternStatusSchema.optional(),
-}))
 ```
 
 ---
@@ -469,23 +388,22 @@ export const paginationSchema = z.object({
 ## Validation Commands
 
 ```bash
-bun run typecheck    # TypeScript check
-bun run build        # Build API
-bun run test         # Run tests
 bun run dev          # Development server (port 3001)
+bun run typecheck    # TypeScript check
+bun run build        # Production build
+bun run test         # Run tests
 ```
 
 ---
 
-## Handoffs
+## Documentation Lookup
 
-| Downstream | When |
-|------------|------|
-| `hono-specialist` | For route implementation details |
-| `testing-consultant` | For service/job tests |
-| `foundation-specialist` | For database schema changes |
+For Hono patterns not covered here:
+```
+ref_search_documentation("Hono [pattern name]")
+```
 
-| Upstream | When |
-|----------|------|
-| `orchestrator-specialist` | Routes complex backend tasks here |
-| `hono-specialist` | Needs service layer patterns |
+For tRPC patterns not covered here:
+```
+ref_search_documentation("tRPC [pattern name]")
+```

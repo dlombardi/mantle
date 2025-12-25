@@ -105,50 +105,6 @@ mantle/
 
 ---
 
-## Agent Skills
-
-This project has specialized skills in `.claude/skills/`. **Always check for relevant skills before starting any task.**
-
-### Available Skills
-
-| Skill | Domain | When to Activate |
-|-------|--------|------------------|
-| `hono-specialist` | API routes, middleware, Hono handlers | Files in `apps/api/src/routes/`, keywords: `route`, `middleware`, `handler`, `c.json` |
-| `frontend-architect` | React components, hooks, state | Files in `apps/web/src/`, keywords: `component`, `useState`, `useQuery`, `tsx` |
-| `testing-consultant` | Tests, mocks, fixtures | Files matching `*.test.ts`, `*.spec.ts`, keywords: `test`, `mock`, `vitest` |
-| `backend-architect` | Services, jobs, error handling | Files in `apps/api/src/services/`, `apps/api/src/jobs/`, keywords: `service`, `job`, `error` |
-| `foundation-specialist` | Config, tooling, monorepo | Files matching `*.config.*`, `drizzle/`, keywords: `config`, `eslint`, `migration` |
-| `orchestrator-specialist` | Task routing, planning, 3-phase workflow | Default for unclear tasks, keywords: `plan`, `breakdown`, `coordinate` |
-| `planning-workflow` | Implementation planning (Phase 1) | Keywords: `plan bead`, `phase 1`, `implementation plan` |
-| `qa-workflow` | QA verification (Phase 3) | Keywords: `verify`, `qa`, `phase 3`, `qa-checklist` |
-
-### Skill Protocol
-
-1. **Before starting any task**, identify which skill(s) apply based on file paths and task description
-2. **Read the SKILL.md**: `cat .claude/skills/<skill-name>/SKILL.md`
-3. **Check references**: Skills may have example code in their `references/` subdirectory
-4. **Multiple skills**: Tasks often span domains—read all relevant skills (e.g., `hono-specialist` + `testing-consultant` for "add endpoint with tests")
-
-### Activation Precedence
-
-1. Explicit user request (`use the backend-architect skill`)
-2. File path patterns (editing `routes/*.ts` → hono-specialist)
-3. Keyword matching in task description
-4. Default: `orchestrator-specialist` for ambiguous tasks
-
-### Handoff Protocol
-
-When work spans multiple skill domains, use this format:
-
-```
-HANDOFF TO: <skill-name>
-CONTEXT: <brief summary of current state>
-TASK: <specific work for the next skill>
-FILES: <relevant files to read>
-```
-
----
-
 ## Key Decisions
 
 | ID | Decision | Impact |
@@ -395,240 +351,61 @@ git push                # Push to remote
 
 ## Three-Phase Agentic Workflow
 
-For beads that require automated QA verification, use this structured workflow:
+This project uses a structured workflow: **Plan → Build → Verify**
 
-```
-Phase 1: Planning     →  Phase 2: Implementation  →  Phase 3: Verification
-(planning-workflow)      (domain skills)             (qa-workflow)
-```
+> **Full workflow documentation:** `.claude/skills/orchestrator-specialist/SKILL.md`
+> **QA harness reference:** `.claude/skills/qa-workflow/SKILL.md`
 
-### Prerequisites
-
-Before running the workflow, ensure:
-
-1. **Vercel preview environment** is configured (auto-deploys on push)
-2. **Railway preview environment** exists with `VERCEL_ENV=preview`
-3. **Supabase configuration aligned** - Railway and Vercel must use the SAME Supabase project
-4. **Supabase redirect URLs** include the preview domain in Authentication → URL Configuration
-5. **Bypass token** is set in `.env.local` (see Vercel Preview Access below)
-
-See `docs/preview-environment-setup.md` for full setup instructions.
-
-### Stable Preview URLs
+### Preview URLs (Stable)
 
 | Service | URL |
 |---------|-----|
 | **Web (Vercel)** | `https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app` |
 | **API (Railway)** | `https://mantleapi-preview.up.railway.app` |
 
-These URLs are stable for the `preview` branch. Feature branches get unique URLs.
+Feature branches: `https://mantle-git-<branch>-darienlombardi-2455s-projects.vercel.app`
 
-### Phase 1: Planning
+### Quick Reference
 
-**Trigger:** New bead from `bd ready`
+| Phase | Skill | Output |
+|-------|-------|--------|
+| 1. Plan | `planning-workflow` | `.beads/artifacts/<id>/plan.md` |
+| 2. Build | Domain skill | `.beads/artifacts/<id>/qa-checklist.md` |
+| 3. Verify | `qa-workflow` | `.beads/artifacts/<id>/qa-report.md` |
 
-**Skills:** `orchestrator-specialist` + `planning-workflow`
+> ⚠️ **CRITICAL:** Never `bd close` without Phase 3 completion. Unit tests ≠ QA verification.
 
-**Steps:**
-1. Pick bead with `bd ready`
-2. **Immediately sync** to persist bead: `bd sync`
-3. Analyze codebase for implementation approach
-4. Write `.beads/artifacts/<bead-id>/plan.md`
-5. Review and approve plan
+---
 
-**Transition:**
-```bash
-bd update <bead-id> --status in_progress
-bd label add <bead-id> phase:building
-```
+## Documentation Lookup
 
-### Phase 2: Implementation
+This project uses the **Ref MCP server** for on-demand documentation access. Use Ref instead of relying on memorized framework patterns.
 
-**Trigger:** Approved plan from Phase 1
+### Use Ref For
 
-**Skills:** Domain skill (hono-specialist, frontend-architect, etc.)
+| Category | Example Queries |
+|----------|-----------------|
+| **UI Components** | `ref_search_documentation("base-ui react Dialog component")` |
+| **Frameworks** | `ref_search_documentation("Hono middleware async context")` |
+| **Libraries** | `ref_search_documentation("Drizzle ORM relations one-to-many")` |
+| **APIs** | `ref_search_documentation("Supabase auth getUser server-side")` |
 
-**Steps:**
-1. Read `plan.md`
-2. Implement code changes
-3. Write tests
-4. Push to trigger Vercel preview
-5. Write `.beads/artifacts/<bead-id>/qa-checklist.md`
+### UI Component Workflow
 
-**Transition:**
-```bash
-bd label add <bead-id> phase:verifying
-```
+When building React components:
 
-### Phase 3: Verification
-
-**Trigger:** Implementation complete, preview deployed
-
-**Skills:** `qa-workflow` (spawned as fresh subprocess)
-
-**Steps:**
-1. Read `qa-checklist.md`
-2. Wait for Vercel preview to be ready
-3. Run QA harness (see full CLI reference below)
-4. Generate `.beads/artifacts/<bead-id>/qa-report.md`
-
-**Exit Conditions:**
-
-| Outcome | Action |
-|---------|--------|
-| PASS | `bd close <id> --reason "QA passed"` |
-| FAIL (<3 iterations) | Loop to Phase 2 |
-| FAIL (=3 iterations) | `bd label add <id> needs-human` |
-
-### Bead Closure Requirements
-
-> ⚠️ **CRITICAL: NEVER close a bead without completing Phase 3.**
-
-Before using `bd close`, verify ALL conditions are met:
-
-1. **qa-checklist.md exists** - `.beads/artifacts/<bead-id>/qa-checklist.md` was created in Phase 2
-2. **Phase 3 was executed** - `qa-workflow` skill was invoked and ran the QA harness
-3. **QA passed OR escalated** - Either `qa-report.md` shows PASS, or `needs-human` label was applied
-
-**Unit tests passing locally is NOT sufficient.** The QA harness must verify the feature works in the preview environment.
-
-If you find yourself about to close a bead without Phase 3:
-1. STOP
-2. Create the `qa-checklist.md`
-3. Push changes to trigger preview deployment
-4. Run `qa-workflow` skill
-5. Only then proceed with `bd close`
-
-### Vercel Preview Access
-
-Preview deployments require `VERCEL_PROTECTION_BYPASS` in `.env.local`. The QA harness reads this automatically.
-
-### Preview URL
-
-**Stable preview URL:** `https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app`
-
-Feature branches deploy to: `https://mantle-git-<branch>-darienlombardi-2455s-projects.vercel.app`
-
-### Artifact Storage
+1. **Always check @base-ui/react first** via Ref
+2. Check existing wrappers in `apps/web/src/components/ui/`
+3. Create wrapper if needed following project patterns
+4. Only create custom components when base-ui lacks a suitable primitive
 
 ```
-.beads/artifacts/<bead-id>/
-├── plan.md           # Phase 1 output
-├── qa-checklist.md   # Phase 2 output
-└── qa-report.md      # Phase 3 output
+ref_search_documentation("base-ui react [component type] props API")
+ref_read_url("https://base-ui.com/react/components/[name]")
 ```
 
-**Important:** This directory is **gitignored** (local only). Artifacts don't survive if:
-- Bead ID changes during sync
-- Working directory is cleaned
+### Don't Use Ref For
 
-For critical beads, back up artifacts or reference content in bead notes.
-
-### Bead Lifecycle Warning
-
-**Always sync immediately after creating a bead:**
-
-```bash
-bd create --title="..." --type=task --priority=2
-bd sync  # ← Critical: persists bead to git before it can be purged
-```
-
-Without immediate sync, beads can be purged during subsequent `bd sync` operations.
-
-### Label Conventions
-
-```bash
-# Phase tracking
-bd label add <id> phase:planning
-bd label add <id> phase:building
-bd label add <id> phase:verifying
-
-# Iteration tracking
-bd label add <id> qa:iteration-1
-bd label add <id> qa:iteration-2
-bd label add <id> qa:iteration-3
-
-# Outcomes
-bd label add <id> qa:passed
-bd label add <id> needs-human
-```
-
-### QA Harness Full Reference
-
-```bash
-bun run test:qa-harness -- \
-  --preview-url=<url>              # Required: Vercel preview URL (web app)
-  --checklist=<path>               # Required: Path to qa-checklist.md
-  --bead-id=<id>                   # Required: Bead ID for artifact output
-  --api-url=<url>                  # Railway API URL (for split deployments)
-  --bypass-token=<token>           # Vercel protection bypass (or use VERCEL_PROTECTION_BYPASS env)
-  --skip-seed                      # Skip database seeding (for DB-free endpoints)
-  --headed                         # Run browser visibly (for debugging)
-  --iteration=<1-3>                # Track retry iteration (default: 1)
-  --timeout=<seconds>              # Timeout in seconds (default: 300)
-```
-
-**Environment variables (alternative to CLI flags):**
-- `VERCEL_PROTECTION_BYPASS` - Bypass token for Vercel deployment protection
-- `QA_API_URL` - Railway API URL (alternative to `--api-url`)
-
-**Examples:**
-
-```bash
-# Standard run against preview (split web/API deployment)
-bun run test:qa-harness -- \
-  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
-  --api-url=https://mantleapi-preview.up.railway.app \
-  --checklist=.beads/artifacts/bead-001/qa-checklist.md \
-  --bead-id=bead-001 \
-  --skip-seed
-
-# Full run with seeding
-bun run test:qa-harness -- \
-  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
-  --api-url=https://mantleapi-preview.up.railway.app \
-  --checklist=.beads/artifacts/bead-001/qa-checklist.md \
-  --bead-id=bead-001
-
-# Debug mode with visible browser
-bun run test:qa-harness -- \
-  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
-  --api-url=https://mantleapi-preview.up.railway.app \
-  --checklist=.beads/artifacts/bead-003/qa-checklist.md \
-  --bead-id=bead-003 \
-  --headed \
-  --skip-seed
-```
-
-**How authentication works:** The QA harness automatically authenticates by:
-1. Calling `POST /api/test/session` on the API to create a test user session
-2. Injecting the session tokens into browser localStorage
-3. Reloading the page to pick up the authenticated state
-
-This enables testing authenticated flows without manual OAuth.
-
-### Seed API Reference
-
-```bash
-# List available scenarios
-curl <preview-url>/api/seed
-
-# Load a scenario
-curl -X POST <preview-url>/api/seed \
-  -H "Content-Type: application/json" \
-  -d '{"scenario": "with-test-user"}'
-
-# Reset to empty state
-curl -X DELETE <preview-url>/api/seed
-```
-
-**Available scenarios:** `empty-repo`, `with-test-user`, `with-patterns`
-
-### Related Skills
-
-| Skill | Role in Workflow |
-|-------|------------------|
-| `planning-workflow` | Phase 1 - Creates implementation plans |
-| `qa-workflow` | Phase 3 - Runs verification |
-| `orchestrator-specialist` | Coordinates phases, manages handoffs |
-| `testing-consultant` | Phase 2 - Test patterns during implementation |
+- **Project-specific patterns** → Use skills (`.claude/skills/`)
+- **Beads workflow** → See orchestrator-specialist
+- **Custom conventions** → Documented in this file (response format, error codes)

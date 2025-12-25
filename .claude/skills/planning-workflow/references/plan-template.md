@@ -143,7 +143,7 @@ Add CRUD endpoints for user preferences with Zod validation and proper error han
 
 ### Step 1: Create Preferences Route
 
-**Skill:** `hono-specialist`
+**Skill:** `api-backend`
 **Files:**
 - `apps/api/src/routes/preferences.ts` - New route file
 - `apps/api/src/index.ts` - Mount new route
@@ -155,7 +155,7 @@ Add CRUD endpoints for user preferences with Zod validation and proper error han
 
 ### Step 2: Add Database Schema
 
-**Skill:** `foundation-specialist`
+**Skill:** `api-backend`
 **Files:**
 - `supabase/migrations/NNNN_add_preferences.sql` - Migration
 - `apps/api/src/lib/db/schema.ts` - Drizzle schema

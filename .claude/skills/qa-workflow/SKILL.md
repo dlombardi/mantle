@@ -1,51 +1,37 @@
 # QA Workflow
 
-> **Reference:** This skill implements Phase 3 of the Three-Phase Workflow defined in `CLAUDE.md`.
-> Read CLAUDE.md first for prerequisites, preview URL, bypass token setup, and full QA harness CLI reference.
+> **Reference:** Phase 3 of the Three-Phase Workflow. See `orchestrator-specialist/SKILL.md` for workflow overview.
+> This file contains the canonical QA harness CLI reference.
 
-Phase 3 agent for the three-phase agentic coding workflow. Verifies implementation against acceptance criteria using the QA harness.
+Phase 3 agent: Verifies implementation against acceptance criteria using the QA harness.
 
 ---
 
 ## Activation
 
-Invoke this skill when:
+Invoke when:
 - Starting Phase 3 verification after implementation
-- Builder has completed code and produced `qa-checklist.md`
-- A Vercel preview deployment is ready for testing
-- User requests QA verification of a bead
+- Builder completed code and produced `qa-checklist.md`
+- Vercel preview deployment is ready
 
-**Trigger keywords:** `verify`, `qa`, `phase 3`, `test implementation`, `qa-checklist`
-
-**Example triggers:**
-- "Verify bead #bd-a1b2"
-- "Run QA for the preferences feature"
-- "Start Phase 3 verification"
-- "Check if the implementation passes acceptance criteria"
+**Trigger keywords:** `verify`, `qa`, `phase 3`, `qa-checklist`
 
 ---
 
 ## CRITICAL: Fresh Context Protocol
 
-This skill is designed to run in a **fresh subprocess** to prevent context bleed from prior phases.
-
-When spawned via Task tool, the QA agent:
-1. **IGNORES** all prior conversation context
-2. **ONLY reads** artifacts from `.beads/artifacts/<bead-id>/`
-3. **ONLY knows** the preview URL and iteration count passed in prompt
+This skill runs in a **fresh subprocess** to prevent context bleed from prior phases.
 
 ```typescript
-// Example Task tool invocation (by orchestrator)
 Task({
   subagent_type: 'qa-workflow',
   prompt: `
     FRESH CONTEXT - Ignore prior conversation
+    Bead: ${beadId}
+    Preview URL: https://mantle-git-preview-...
+    Iteration: ${iteration}/3
 
-    Bead: bd-a1b2
-    Preview URL: https://mantle-xyz-abc123.vercel.app
-    Iteration: 1/3
-
-    Read: .beads/artifacts/bd-a1b2/qa-checklist.md
+    Read: .beads/artifacts/${beadId}/qa-checklist.md
     Run QA harness and produce qa-report.md
   `
 })
@@ -53,253 +39,89 @@ Task({
 
 ---
 
-## Split Deployment Architecture
+## Split Deployment URLs
 
-This project uses split deployments:
-- **Web (Vercel):** `https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app`
-- **API (Railway):** `https://mantleapi-preview.up.railway.app`
+| Service | URL |
+|---------|-----|
+| **Web (Vercel)** | `https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app` |
+| **API (Railway)** | `https://mantleapi-preview.up.railway.app` |
 
-The QA harness needs BOTH URLs to function correctly.
+The QA harness needs BOTH URLs (test session endpoint lives on Railway).
 
 ---
 
-## Workflow Protocol
+## Protocol
 
-### Step 1: Load QA Checklist
-
-Read the checklist produced by Builder in Phase 2:
-```
-.beads/artifacts/<bead-id>/qa-checklist.md
-```
-
-The checklist contains:
-- Verification steps from the Builder
-- Expected behaviors for each step
-- Test data requirements
-- Seed scenario to use
-
-### Step 2: Prepare Environment
-
-```bash
-# Verify web preview is accessible
-curl -I https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app/api/health/live
-
-# Verify API is accessible
-curl -I https://mantleapi-preview.up.railway.app/api/health/live
-
-# (Optional) Seed the preview with test data - harness does this automatically
-curl -X POST https://mantleapi-preview.up.railway.app/api/seed \
-  -H "Content-Type: application/json" \
-  -d '{"scenario": "<scenario-name>"}'
-```
-
-### Step 3: Run QA Harness
-
-Execute the QA harness script with BOTH URLs:
-```bash
-bun run test:qa-harness -- \
-  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
-  --api-url=https://mantleapi-preview.up.railway.app \
-  --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
-  --bead-id=<bead-id> \
-  --skip-seed
-```
-
-**Why `--api-url`?** The test session endpoint (`/api/test/session`) lives on Railway, not Vercel.
-
-The harness will:
-1. Authenticate via test session injection (no manual OAuth needed)
-2. Reset and seed the preview environment (if not skipped)
-3. Run browser-based verification (Playwright)
-4. Generate structured results
-
-### Step 4: Generate QA Report
-
-Write results to:
-```
-.beads/artifacts/<bead-id>/qa-report.md
-```
-
-Use template from `references/qa-report-template.md`.
-
-### Step 5: Determine Outcome
+1. **Load QA checklist** — `.beads/artifacts/<bead-id>/qa-checklist.md`
+2. **Run QA harness** (see CLI reference below)
+3. **Generate qa-report.md**
+4. **Determine outcome:**
 
 | Outcome | Action |
 |---------|--------|
-| **PASS** | Close bead, add `qa:passed` label |
-| **FAIL (iteration < 3)** | Update bead note, return to Phase 2 |
-| **FAIL (iteration = 3)** | Add `needs-human` label, escalate |
+| **PASS** | `bd close <id> --reason "QA passed"` |
+| **FAIL (< 3 iterations)** | Return to Phase 2 |
+| **FAIL (= 3 iterations)** | `bd label add <id> needs-human` |
 
 ---
 
-## Verification Categories
-
-### Functional Verification
-- [ ] Primary user flow works
-- [ ] All acceptance criteria met
-- [ ] Error handling works correctly
-- [ ] Edge cases handled
-
-### Technical Verification
-- [ ] No console errors
-- [ ] No network errors (4xx, 5xx)
-- [ ] Performance acceptable (< 3s load)
-- [ ] Accessibility basics pass
-
-### Test Verification
-- [ ] Unit tests pass (`bun run test`)
-- [ ] E2E tests pass (`bun run test:e2e`)
-- [ ] No test regressions
-
----
-
-## Exit Conditions
-
-### On PASS
+## QA Harness CLI Reference (Canonical)
 
 ```bash
-bd close <bead-id> --reason "QA passed - all acceptance criteria verified"
-bd label add <bead-id> qa:passed
+bun run test:qa-harness -- \
+  --preview-url=<url>              # Required: Vercel preview URL
+  --checklist=<path>               # Required: Path to qa-checklist.md
+  --bead-id=<id>                   # Required: Bead ID for artifact output
+  --api-url=<url>                  # Railway API URL (for split deployments)
+  --bypass-token=<token>           # Vercel protection bypass
+  --skip-seed                      # Skip database seeding
+  --headed                         # Run browser visibly (debugging)
+  --iteration=<1-3>                # Track retry iteration (default: 1)
+  --timeout=<seconds>              # Timeout in seconds (default: 300)
 ```
 
-The bead is ready for PR merge.
-
-### On FAIL (Can Retry)
+### Standard Usage
 
 ```bash
-bd update <bead-id> --note "QA Iteration N failed: [summary of failures]"
-bd label add <bead-id> qa:iteration-N
-```
-
-Return to Phase 2 with:
-```
-HANDOFF TO: <original-builder-skill>
-PHASE: 2 (Implementation - Iteration N+1)
-BEAD: <bead-id>
-CONTEXT: QA failed, see qa-report.md
-TASK: Fix issues identified in qa-report.md
-FILES: .beads/artifacts/<bead-id>/qa-report.md
-```
-
-### On FAIL (Max Iterations)
-
-```bash
-bd label add <bead-id> needs-human
-bd update <bead-id> --note "Max iterations (3) reached, escalating to human review"
-```
-
-Human reviews by running:
-```bash
-bd ready --label needs-human
-```
-
----
-
-## QA Harness Commands
-
-> **Full CLI reference:** See `CLAUDE.md` → "QA Harness Full Reference"
-
-```bash
-# Standard run against preview (RECOMMENDED)
+# Recommended: Split web/API deployment
 bun run test:qa-harness -- \
   --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
   --api-url=https://mantleapi-preview.up.railway.app \
   --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
   --bead-id=<bead-id> \
   --skip-seed
-
-# With seeding (if checklist requires test data)
-bun run test:qa-harness -- \
-  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
-  --api-url=https://mantleapi-preview.up.railway.app \
-  --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
-  --bead-id=<bead-id>
-
-# Debug mode with visible browser
-bun run test:qa-harness -- \
-  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
-  --api-url=https://mantleapi-preview.up.railway.app \
-  --checklist=.beads/artifacts/<bead-id>/qa-checklist.md \
-  --bead-id=<bead-id> \
-  --headed \
-  --skip-seed
 ```
 
-**Environment variables (read from `.env.local`):**
-- `VERCEL_PROTECTION_BYPASS` - Bypass token for Vercel deployment protection
-- `QA_API_URL` - Alternative to `--api-url` flag
+### Environment Variables
 
-**How authentication works:** The harness automatically:
-1. Calls `POST /api/test/session` on the Railway API
-2. Creates a test user session via Supabase Admin API
-3. Injects session tokens into browser localStorage
-4. Tests run as authenticated user (no manual OAuth needed)
+- `VERCEL_PROTECTION_BYPASS` — Bypass token for Vercel deployment protection
+- `QA_API_URL` — Alternative to `--api-url` flag
 
----
+### Authentication
 
-## Artifact Location
-
-```
-.beads/artifacts/<bead-id>/
-├── plan.md           # From Phase 1 (Planner)
-├── qa-checklist.md   # From Phase 2 (Builder)
-└── qa-report.md      # From Phase 3 (QA) ← You write this
-```
+The harness automatically:
+1. Calls `POST /api/test/session` on Railway API
+2. Injects session tokens into browser localStorage
+3. Tests run as authenticated user (no manual OAuth)
 
 ---
 
 ## Error Handling
 
-### Preview Not Ready
-
-If preview URL returns non-200:
-1. Wait 30 seconds and retry (up to 3 times)
-2. If still failing, report in qa-report.md as "Environment Error"
-3. This does NOT count as QA iteration failure
-
-### Seed Endpoint Fails
-
-If seeding fails:
-1. Check if seed endpoint exists
-2. Verify scenario name is valid
-3. Report as "Seed Error" in qa-report.md
-4. This does NOT count as QA iteration failure
-
-### Harness Timeout
-
-If harness takes > 5 minutes:
-1. Capture partial results
-2. Report as "Timeout" in qa-report.md
-3. This DOES count as QA iteration failure
+| Error Type | Counts as Failure? | Action |
+|------------|-------------------|--------|
+| Preview not ready | No | Retry 3x with 30s wait, report as "Environment Error" |
+| Seed endpoint fails | No | Report as "Seed Error" |
+| Harness timeout (> 5min) | Yes | Capture partial results, report as "Timeout" |
 
 ---
 
-## Handoffs
+## Handoff on Failure
 
-| Upstream | When |
-|----------|------|
-| `orchestrator-specialist` | Routes QA tasks here |
-| Builder skills | After implementation complete |
-
-| Downstream | When |
-|------------|------|
-| Builder skills | On failure, return to Phase 2 |
-| Human reviewer | On max iterations (needs-human) |
-
----
-
-## Validation Commands
-
-```bash
-# Check bead status
-bd show <bead-id>
-
-# Verify artifacts exist
-ls -la .beads/artifacts/<bead-id>/
-
-# Check current labels
-bd show <bead-id> | grep -i label
-
-# View qa-report
-cat .beads/artifacts/<bead-id>/qa-report.md
+```
+HANDOFF TO: <original-builder-skill>
+PHASE: 2 (Implementation - Iteration N+1)
+BEAD: <bead-id>
+CONTEXT: QA failed, see qa-report.md
+TASK: Fix issues identified in report
 ```

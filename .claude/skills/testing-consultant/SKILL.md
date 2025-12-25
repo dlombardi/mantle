@@ -143,40 +143,10 @@ describe('formatCurrency', () => {
 
 ## Component Test Patterns
 
-### React Testing Library
-```typescript
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
-import { Button } from './Button';
-
-describe('Button', () => {
-  it('should render with text', () => {
-    render(<Button>Click me</Button>);
-    expect(screen.getByRole('button', { name: 'Click me' })).toBeInTheDocument();
-  });
-
-  it('should call onClick when clicked', () => {
-    const handleClick = vi.fn();
-    render(<Button onClick={handleClick}>Click</Button>);
-
-    fireEvent.click(screen.getByRole('button'));
-
-    expect(handleClick).toHaveBeenCalledOnce();
-  });
-
-  it('should be disabled when loading', () => {
-    render(<Button loading>Submit</Button>);
-    expect(screen.getByRole('button')).toBeDisabled();
-  });
-});
+For React Testing Library patterns (queries, events, async), use Ref:
 ```
-
-### Query Priority (user-centric)
-1. `getByRole` - Most accessible
-2. `getByLabelText` - Form fields
-3. `getByPlaceholderText` - Inputs
-4. `getByText` - Non-interactive content
-5. `getByTestId` - Last resort
+ref_search_documentation("React Testing Library queries priority")
+```
 
 ---
 
@@ -336,67 +306,12 @@ it('validates input schema', async () => {
 
 ## E2E Test Patterns (Playwright)
 
-### Basic Test Structure
-```typescript
-import { test, expect } from '@playwright/test';
-
-test.describe('Authentication', () => {
-  test('user can sign in with email', async ({ page }) => {
-    await page.goto('/login');
-
-    await page.getByLabel('Email').fill('test@example.com');
-    await page.getByLabel('Password').fill('password123');
-    await page.getByRole('button', { name: 'Sign In' }).click();
-
-    await expect(page).toHaveURL('/dashboard');
-    await expect(page.getByText('Welcome back')).toBeVisible();
-  });
-});
+For Playwright patterns (locators, assertions, Page Object Model), use Ref:
+```
+ref_search_documentation("Playwright testing patterns")
 ```
 
-### Page Object Model
-```typescript
-// e2e/pages/LoginPage.ts
-import { Page, Locator } from '@playwright/test';
-
-export class LoginPage {
-  readonly page: Page;
-  readonly emailInput: Locator;
-  readonly passwordInput: Locator;
-  readonly submitButton: Locator;
-
-  constructor(page: Page) {
-    this.page = page;
-    this.emailInput = page.getByLabel('Email');
-    this.passwordInput = page.getByLabel('Password');
-    this.submitButton = page.getByRole('button', { name: 'Sign In' });
-  }
-
-  async goto() {
-    await this.page.goto('/login');
-  }
-
-  async login(email: string, password: string) {
-    await this.emailInput.fill(email);
-    await this.passwordInput.fill(password);
-    await this.submitButton.click();
-  }
-}
-
-// e2e/auth.spec.ts
-import { test, expect } from '@playwright/test';
-import { LoginPage } from './pages/LoginPage';
-
-test('user can sign in', async ({ page }) => {
-  const loginPage = new LoginPage(page);
-  await loginPage.goto();
-  await loginPage.login('test@example.com', 'password123');
-
-  await expect(page).toHaveURL('/dashboard');
-});
-```
-
-### Playwright Config (Dual WebServer)
+### Project-Specific: Dual WebServer Config
 
 Our config starts both API and Web servers for full-stack E2E testing:
 
@@ -449,85 +364,20 @@ export default defineConfig({
 
 ## Mocking Patterns
 
-### Supabase Client Mock
+For Vitest mocking patterns (spies, mocks, stubs), use Ref:
+```
+ref_search_documentation("Vitest mocking vi.mock vi.fn")
+```
+
+### Project-Specific: Supabase Mock
+
+Located in `packages/test-utils/src/mocks/supabase.ts`:
 ```typescript
-import { vi } from 'vitest';
-
-export function createMockSupabase() {
-  return {
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      delete: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn(),
-    })),
-    auth: {
-      getUser: vi.fn(),
-      signInWithOAuth: vi.fn(),
-      signOut: vi.fn(),
-    },
-  };
-}
-
-// Usage in test
-import { createMockSupabase } from './mocks/supabase';
+import { createMockSupabase } from '@mantle/test-utils';
 
 vi.mock('@/lib/supabase', () => ({
   getSupabaseClient: () => createMockSupabase(),
 }));
-```
-
-### Environment Variables
-```typescript
-// vitest.config.ts or test setup
-import { vi } from 'vitest';
-
-vi.stubEnv('VITE_SUPABASE_URL', 'http://localhost:54321');
-vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'test-anon-key');
-vi.stubEnv('VITE_API_URL', 'http://localhost:3001');
-```
-
-### Fetch Mock
-```typescript
-import { vi, beforeEach, afterEach } from 'vitest';
-
-beforeEach(() => {
-  vi.spyOn(global, 'fetch').mockResolvedValue(
-    new Response(JSON.stringify({ data: 'mocked' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  );
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-```
-
----
-
-## Test Data Factories
-
-### Generic Factory Pattern
-```typescript
-// tests/factories/user.ts
-import { faker } from '@faker-js/faker';
-
-export function createUser(overrides = {}) {
-  return {
-    id: faker.string.uuid(),
-    email: faker.internet.email(),
-    name: faker.person.fullName(),
-    createdAt: faker.date.past().toISOString(),
-    ...overrides,
-  };
-}
-
-// Usage
-const user = createUser({ name: 'Test User' });
 ```
 
 ---
@@ -594,8 +444,7 @@ This skill covers **unit, integration, and E2E tests** (Phase 2). QA verificatio
 | Upstream | When |
 |----------|------|
 | `orchestrator-specialist` | Routes testing tasks here |
-| `backend-architect` | After implementing services/APIs |
+| `api-backend` | After implementing services/APIs/routes |
 | `frontend-architect` | After implementing components |
-| `hono-specialist` | After implementing routes |
 
 Tests are typically the final step in a feature workflow.

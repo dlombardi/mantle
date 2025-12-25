@@ -175,43 +175,21 @@ export function PatternCard({ pattern, onSelect }: PatternCardProps) {
 
 When a new UI component is needed:
 
-1. **Check @base-ui/react first**
-   - Browse [base-ui components](https://base-ui.com/react/components/) for a suitable primitive
-   - Base-UI provides unstyled, accessible components: Button, Checkbox, Dialog, Menu, Popover, Select, Slider, Switch, Tabs, Tooltip, etc.
+1. **Always check @base-ui/react first via Ref**
+   ```
+   ref_search_documentation("base-ui react [component type] props API")
+   ref_read_url("https://base-ui.com/react/components/[name]")
+   ```
 
-2. **Check existing wrappers**
-   - Look in `apps/web/src/components/ui/` for existing styled components
+2. **Check existing wrappers** in `apps/web/src/components/ui/`
    - Currently available: `Button`, `Checkbox`, `Dialog`, `Switch`
 
-3. **Create wrapper if needed**
-   - If base-ui has the primitive but we don't have a wrapper, create one
-   - Follow the pattern in `components/ui/button.tsx`:
-     - Import from `@base-ui/react/<component>`
-     - Add Tailwind styling with variant/size props
-     - Use `cn()` utility for class merging
-     - Export with proper TypeScript types
+3. **Create wrapper if needed** following our pattern:
+   - Import from `@base-ui/react/<component>`
+   - Add Tailwind styling with variant/size props
+   - Use `cn()` utility for class merging
 
-4. **Only create custom components when**
-   - base-ui doesn't have a suitable primitive
-   - The component is app-specific (e.g., PatternCard, RepoSelector)
-
-**Example wrapper pattern:**
-```typescript
-import { Button as BaseButton } from '@base-ui/react/button';
-import { cn } from '@/lib/utils';
-
-const variants = { default: '...', outline: '...' } as const;
-
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'default', className, ...props }, ref) => (
-    <BaseButton
-      ref={ref}
-      className={cn(variants[variant], className)}
-      {...props}
-    />
-  )
-);
-```
+4. **Only create custom components** when base-ui lacks a suitable primitive
 
 ---
 
@@ -358,81 +336,17 @@ function PromoteButton({ patternId }: { patternId: string }) {
 }
 ```
 
-### Optimistic Updates (tRPC)
-```typescript
-const { mutate } = trpc.patterns.updateStatus.useMutation({
-  onMutate: async (newData) => {
-    // Cancel outgoing refetches
-    await utils.patterns.list.cancel();
+### Optimistic Updates
 
-    // Snapshot previous value
-    const previousData = utils.patterns.list.getData();
-
-    // Optimistically update
-    utils.patterns.list.setData(undefined, (old) => ({
-      ...old,
-      items: old?.items.map((p) =>
-        p.id === newData.id ? { ...p, status: newData.status } : p
-      ),
-    }));
-
-    return { previousData };
-  },
-  onError: (err, newData, context) => {
-    // Rollback on error
-    utils.patterns.list.setData(undefined, context?.previousData);
-  },
-});
+For tRPC cache management (`onMutate`, `setData`), use Ref:
+```
+ref_search_documentation("tRPC React Query optimistic updates")
 ```
 
-### Optimistic Updates (React 19 useOptimistic)
-
-For simpler UI-first updates, use React 19's `useOptimistic` hook:
-
-```typescript
-import { useOptimistic } from 'react';
-
-interface Pattern {
-  id: string;
-  name: string;
-  status: 'pending' | 'candidate' | 'authoritative';
-}
-
-function PatternList({ patterns }: { patterns: Pattern[] }) {
-  const [optimisticPatterns, addOptimistic] = useOptimistic(
-    patterns,
-    (current, newPattern: Pattern) => [...current, newPattern]
-  );
-
-  async function handleCreate(formData: FormData) {
-    const tempPattern: Pattern = {
-      id: crypto.randomUUID(),
-      name: formData.get('name') as string,
-      status: 'pending',
-    };
-
-    addOptimistic(tempPattern); // Instant UI update
-    await createPatternMutation(formData); // Server sync
-  }
-
-  return (
-    <ul>
-      {optimisticPatterns.map((p) => (
-        <li
-          key={p.id}
-          className={p.status === 'pending' ? 'opacity-50' : ''}
-        >
-          {p.name}
-        </li>
-      ))}
-    </ul>
-  );
-}
+For React 19's `useOptimistic`, use Ref:
 ```
-
-**When to use each:**
-- **tRPC `onMutate`**: Complex cache updates, multiple query invalidations
-- **`useOptimistic`**: Simple list additions, toggle states, UI-first feedback
+ref_search_documentation("React 19 useOptimistic")
+```
 
 ### Prefetching
 ```typescript
@@ -445,172 +359,12 @@ await utils.patterns.list.prefetch({ repoId });
 
 ---
 
-## The `use` API
+## React 19 Patterns
 
-React 19's `use` hook is unique—it can be called conditionally and in loops (unlike other hooks):
-
-### Reading Promises Conditionally
-```typescript
-import { use, Suspense } from 'react';
-
-interface Props {
-  patternPromise: Promise<Pattern>;
-  shouldLoad: boolean;
-}
-
-function PatternDetails({ patternPromise, shouldLoad }: Props) {
-  if (!shouldLoad) {
-    return <Placeholder />;
-  }
-
-  // ✅ Valid: `use` can be called inside conditions
-  const pattern = use(patternPromise);
-  return <PatternCard pattern={pattern} />;
-}
-
-// Wrap with Suspense for loading states
-function PatternPage({ patternPromise }: { patternPromise: Promise<Pattern> }) {
-  return (
-    <Suspense fallback={<Spinner />}>
-      <PatternDetails patternPromise={patternPromise} shouldLoad={true} />
-    </Suspense>
-  );
-}
+For React 19 patterns (`use`, `useActionState`, `useOptimistic`, hook rules), use Ref:
 ```
-
-### Reading Context Conditionally
-```typescript
-import { use, createContext } from 'react';
-
-const ThemeContext = createContext<'light' | 'dark'>('light');
-
-function ConditionalTheme({ useCustomTheme }: { useCustomTheme: boolean }) {
-  if (useCustomTheme) {
-    // ✅ Valid: `use` works with context too
-    const theme = use(ThemeContext);
-    return <div className={`theme-${theme}`}>Custom themed content</div>;
-  }
-  return <div>Default content</div>;
-}
+ref_search_documentation("React 19 [pattern name]")
 ```
-
-**Caveat**: Promises passed to `use` must be stable across renders. Client-created promises recreate on every render—prefer passing promises from route loaders or parent components.
-
----
-
-## Hook Anti-Patterns
-
-Common mistakes to avoid when using React hooks:
-
-### Invalid: Hooks in Conditions
-```typescript
-// ❌ INVALID: Hook call order changes between renders
-if (isAdmin) {
-  const [perms, setPerms] = useState(adminPerms);
-}
-
-// ✅ VALID: Conditional initial value
-const [perms, setPerms] = useState(
-  isAdmin ? adminPerms : userPerms
-);
-```
-
-### Invalid: Hooks After Early Returns
-```typescript
-// ❌ INVALID: Hook may not execute
-if (!data) return <Loading />;
-const [processed, setProcessed] = useState(data);
-
-// ✅ VALID: Move hook above the return
-const [processed, setProcessed] = useState<Data | null>(null);
-if (!data) return <Loading />;
-```
-
-### Invalid: Component Factories
-```typescript
-// ❌ INVALID: Creates new component identity each call
-function createCard(type: string) {
-  return function Card() {
-    const [state, setState] = useState(); // Hooks break!
-    return <div>{type}</div>;
-  };
-}
-
-// ✅ VALID: Use props instead of factories
-function Card({ type }: { type: string }) {
-  const [state, setState] = useState();
-  return <div>{type}</div>;
-}
-```
-
-### Invalid: Hooks in Callbacks
-```typescript
-// ❌ INVALID: Hooks cannot be called inside event handlers
-<button onClick={() => {
-  const [clicked, setClicked] = useState(false); // Error!
-}} />
-
-// ✅ VALID: Declare hook at component top level
-function Button() {
-  const [clicked, setClicked] = useState(false);
-  return <button onClick={() => setClicked(true)}>Click me</button>;
-}
-```
-
----
-
-## Context Optimization
-
-Prevent unnecessary re-renders when using React Context:
-
-```typescript
-import { createContext, useCallback, useMemo, useState, useContext } from 'react';
-
-interface AuthContextValue {
-  user: User | null;
-  login: (credentials: Credentials) => Promise<void>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null);
-
-function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-
-  // ✅ Stable function references with useCallback
-  const login = useCallback(async (creds: Credentials) => {
-    const response = await authApi.login(creds);
-    setUser(response.user);
-  }, []);
-
-  const logout = useCallback(() => {
-    authApi.logout();
-    setUser(null);
-  }, []);
-
-  // ✅ Memoized context value prevents child re-renders
-  const value = useMemo(
-    () => ({ user, login, logout }),
-    [user, login, logout]
-  );
-
-  return <AuthContext value={value}>{children}</AuthContext>;
-}
-
-// Custom hook for consuming with null check
-function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
-}
-```
-
-**Key principles:**
-- Wrap functions in `useCallback` to maintain stable references
-- Wrap the context value object in `useMemo`
-- Only include values that actually change in the dependency array
 
 ---
 
@@ -672,8 +426,7 @@ bd label add <bead-id> phase:verifying
 | Downstream | When |
 |------------|------|
 | `testing-consultant` | For component tests |
-| `backend-architect` | When UI needs new API endpoints |
-| `hono-specialist` | For specific API route implementation |
+| `api-backend` | When UI needs new API endpoints |
 | `qa-workflow` | After Phase 2 complete, for verification |
 
 | Upstream | When |

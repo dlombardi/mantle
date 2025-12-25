@@ -320,7 +320,7 @@ AC3 failed - preferences do not persist after logout/login cycle.
 Return to Phase 2 with this report:
 
 ```
-HANDOFF TO: hono-specialist
+HANDOFF TO: api-backend
 PHASE: 2 (Implementation - Iteration 3)
 BEAD: bd-a1b2
 CONTEXT: QA failed on AC3 - persistence issue

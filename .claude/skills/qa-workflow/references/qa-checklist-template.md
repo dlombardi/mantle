@@ -137,7 +137,7 @@ bun run lint              # Lint check
 
 **Bead ID:** bd-a1b2
 **Created:** 2024-01-16
-**Builder:** hono-specialist
+**Builder:** api-backend
 
 ---
 
