@@ -1,5 +1,6 @@
 import { PanelLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from './theme-toggle';
 import { UserMenu } from './user-menu';
 
 interface HeaderProps {
@@ -22,7 +23,10 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         </Button>
       </div>
 
-      <UserMenu />
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <UserMenu />
+      </div>
     </header>
   );
 }
