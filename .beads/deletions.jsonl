@@ -148,4 +148,3 @@
 {"id":"mantle-c42","ts":"2025-12-24T02:20:04.648045Z","by":"darienlombardi","reason":"manual delete"}
 {"id":"mantle-scp","ts":"2025-12-24T02:20:04.730495Z","by":"darienlombardi","reason":"manual delete"}
 {"id":"mantle-ayy","ts":"2025-12-24T02:20:04.813917Z","by":"darienlombardi","reason":"manual delete"}
-{"id":"mantle-f38","ts":"2025-12-25T17:16:57.571788Z","by":"git-history-backfill","reason":"recovered from git history (pruned from manifest)"}
