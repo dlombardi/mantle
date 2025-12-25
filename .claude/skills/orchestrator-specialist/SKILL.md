@@ -209,6 +209,7 @@ Before transitioning from Phase 2 → Phase 3, verify these artifacts exist:
 | Phase 3 not executed | Spawn QA agent (see above) |
 | QA passed | `bd close <id> --reason "QA passed"` |
 | QA failed 3x | `bd label add <id> needs-human` (do NOT close) |
+| Bead closed successfully | Output Bead Completion Summary (see below) |
 
 **Why Phase 3 matters:**
 - Unit tests verify code logic in isolation
@@ -227,3 +228,51 @@ CONTEXT: QA failed, see qa-report.md for issues
 TASK: Fix issues identified in report, update qa-checklist.md
 FILES: .beads/artifacts/<bead-id>/qa-report.md
 ```
+
+---
+
+## Bead Completion Summary (Required)
+
+After closing a bead with `bd close`, output a structured summary of skill utilization.
+
+### Template
+
+```
+## Bead Completion Summary: `<bead-id>`
+
+**Bead:** <title>
+**Status:** Closed (QA passed)
+
+### Skills Utilized
+
+| Phase | Skill(s) | Purpose |
+|-------|----------|---------|
+| **Phase 1: Planning** | `orchestrator-specialist`, `planning-workflow` | <brief purpose> |
+| **Phase 2: Implementation** | `<domain-skill(s)>` | <brief purpose> |
+| **Phase 3: Verification** | `qa-workflow` | <brief purpose> |
+
+### Skill Activation Details
+
+1. **<skill-name>** — <why activated, what it contributed>
+2. ...
+
+### Artifacts Produced
+
+.beads/artifacts/<bead-id>/
+├── plan.md           ✓ Phase 1
+├── qa-checklist.md   ✓ Phase 2
+└── qa-report.md      ✓ Phase 3
+
+### Iterations
+
+| # | Outcome | Issue |
+|---|---------|-------|
+| 1 | PASS/FAIL | <brief description if failed> |
+| ... | ... | ... |
+```
+
+### Why This Matters
+
+- **Visibility**: User can inspect how the agent harness employed skills
+- **Debugging**: Identifies if skills were missed or incorrectly routed
+- **Learning**: Surfaces patterns in skill utilization across beads
