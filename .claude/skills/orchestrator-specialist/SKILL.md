@@ -31,7 +31,10 @@ User Request
     │   └── api-backend
     │
     ├─ Contains "component", "UI", "state", "hook", "React"?
-    │   └── frontend-architect
+    │   └── frontend-architect + frontend-design (dual activation)
+    │
+    ├─ Contains "design", "visual", "style", "typography", "animation", "color", "aesthetic"?
+    │   └── frontend-design (+ frontend-architect if creating components)
     │
     ├─ Contains "test", "mock", "fixture", "coverage"?
     │   └── testing-consultant
@@ -83,7 +86,10 @@ BEADS: #42
 |-------|-----------|-----------|
 | `api-backend` | tRPC routers, Hono REST, Drizzle, services, jobs | `packages/trpc/`, `apps/api/src/` |
 | `frontend-architect` | React components, state, routing | `apps/web/src/` |
+| `frontend-design` | Visual design, aesthetics, typography, motion | `apps/web/src/`, `apps/web/src/styles/` |
 | `testing-consultant` | Vitest, Playwright, mocks, coverage | `**/*.test.ts`, `e2e/` |
+
+> **Dual Activation:** For UI creation, activate BOTH `frontend-architect` (structure) + `frontend-design` (aesthetics).
 
 ---
 

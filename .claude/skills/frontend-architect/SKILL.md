@@ -432,3 +432,16 @@ bd label add <bead-id> phase:verifying
 | Upstream | When |
 |----------|------|
 | `orchestrator-specialist` | Routes UI tasks here |
+
+---
+
+## Design Companion
+
+For visual polish beyond structural patterns, also read `frontend-design`:
+- Typography choices beyond Inter
+- Animation and motion patterns
+- Bold aesthetic directions (Linear + Raycast style)
+- Avoiding generic styling
+- Orange accent usage for brand identity
+
+**Dual activation:** When creating new components, read both skills.

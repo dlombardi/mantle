@@ -32,6 +32,10 @@
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
 
+  /* Orange accent (brand identity) */
+  --accent-orange: oklch(0.7 0.18 45);
+  --accent-orange-foreground: oklch(0.98 0 0);
+
   /* Destructive/danger */
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
@@ -115,6 +119,10 @@
   --accent: oklch(0.274 0.006 286.033);
   --accent-foreground: oklch(0.985 0 0);
 
+  /* Orange accent (brand identity - brighter for dark mode) */
+  --accent-orange: oklch(0.75 0.2 45);
+  --accent-orange-foreground: oklch(0.1 0 0);
+
   /* Destructive/danger */
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
@@ -186,6 +194,8 @@ body {
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-accent-orange: var(--accent-orange);
+  --color-accent-orange-foreground: var(--accent-orange-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
