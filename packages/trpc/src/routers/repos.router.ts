@@ -6,7 +6,7 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import { repos } from '@mantle/db';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
@@ -176,22 +176,39 @@ export const reposRouter = router({
   /**
    * Disconnect (delete) a repository.
    *
+   * Verifies user ownership before deletion. Database cascade constraints
+   * handle cleanup of related patterns, violations, etc.
+   *
    * @example
    * const { mutate } = trpc.repos.disconnect.useMutation();
    * mutate({ id: 'uuid' });
    */
   disconnect: protectedProcedure
     .input(repoIdInput)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { id } = input;
+      const db = ctx.db as DrizzleDb;
 
-      // TODO: Implement repository deletion
-      // 1. Verify user owns the repo
-      // 2. Delete repo (cascades to patterns, violations, etc.)
+      // 1. Verify user owns the repo and get details for response
+      const [repo] = await db
+        .select({ id: repos.id, fullName: repos.githubFullName })
+        .from(repos)
+        .where(and(eq(repos.id, id), eq(repos.userId, ctx.user.id)))
+        .limit(1);
+
+      if (!repo) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Repository not found or you do not have permission to delete it',
+        });
+      }
+
+      // 2. Delete repo (cascades to patterns, violations, etc. via FK constraints)
+      await db.delete(repos).where(eq(repos.id, id));
 
       return {
         success: true,
-        message: `Repository ${id} disconnected`,
+        fullName: repo.fullName,
       };
     }),
 

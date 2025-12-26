@@ -5,6 +5,7 @@ import { trpc } from '@/lib/trpc';
 import { RepoCard, type Repo } from '@/components/ui/repo-card';
 import { GitHubConnectModal } from '@/components/github-connect-modal';
 import { RepoSelectorModal, type SelectorRepo } from '@/components/repo-selector-modal';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 
@@ -17,6 +18,7 @@ export function DashboardPage() {
   // Modal states
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showRepoSelector, setShowRepoSelector] = useState(false);
+  const [disconnectingRepo, setDisconnectingRepo] = useState<Repo | null>(null);
 
   // Fetch user's repos
   const {
@@ -64,6 +66,22 @@ export function DashboardPage() {
     },
     onError: (error) => {
       toast.error('Failed to trigger analysis', {
+        description: error.message,
+      });
+    },
+  });
+
+  // Disconnect repo mutation
+  const disconnectMutation = trpc.repos.disconnect.useMutation({
+    onSuccess: (data) => {
+      setDisconnectingRepo(null);
+      toast.success(`Disconnected ${data.fullName}`, {
+        description: 'Repository and all associated data have been removed.',
+      });
+      refetchRepos();
+    },
+    onError: (error) => {
+      toast.error('Failed to disconnect repository', {
         description: error.message,
       });
     },
@@ -204,10 +222,7 @@ export function DashboardPage() {
                     // TODO: Navigate to repo settings
                     toast.info('Repo settings coming soon');
                   }}
-                  onDisconnect={() => {
-                    // TODO: Show disconnect confirmation dialog
-                    toast.info('Disconnect feature coming soon');
-                  }}
+                  onDisconnect={() => setDisconnectingRepo(repo)}
                   onRetry={() => triggerIngestionMutation.mutate({ id: repo.id })}
                 />
               ))}
@@ -235,6 +250,27 @@ export function DashboardPage() {
         connecting={connectMutation.isPending}
         permissionsUrl={`https://github.com/apps/${GITHUB_APP_NAME}/installations/new`}
       />
+
+      {/* Disconnect confirmation dialog */}
+      {disconnectingRepo && (
+        <ConfirmDialog
+          open={!!disconnectingRepo}
+          onOpenChange={(open) => !open && setDisconnectingRepo(null)}
+          title={`Disconnect ${disconnectingRepo.fullName.split('/')[1]}?`}
+          description="This action cannot be undone."
+          confirmText={disconnectingRepo.fullName.split('/')[1]}
+          confirmLabel={`Type "${disconnectingRepo.fullName.split('/')[1]}" to confirm:`}
+          buttonLabel="Disconnect"
+          onConfirm={() => disconnectMutation.mutate({ id: disconnectingRepo.id })}
+          loading={disconnectMutation.isPending}
+          destructive
+          deletionItems={[
+            'All extracted patterns',
+            'Violation history',
+            'Analysis data and evidence',
+          ]}
+        />
+      )}
     </div>
   );
 }
