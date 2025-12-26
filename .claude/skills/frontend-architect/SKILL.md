@@ -191,6 +191,14 @@ When a new UI component is needed:
 
 4. **Only create custom components** when base-ui lacks a suitable primitive
 
+5. **Create Storybook story** as a sibling file to the component:
+   - Story file: `ComponentName.stories.tsx` next to `ComponentName.tsx`
+   - Use Ref MCP to read Storybook docs for patterns and API:
+     ```
+     ref_search_documentation("Storybook React writing stories CSF3")
+     ```
+   - Run with `bun run storybook` (opens at http://localhost:6006)
+
 ---
 
 ## State Management
@@ -384,6 +392,7 @@ bun run dev          # Development server (port 3000)
 When implementing a bead, complete ALL items before considering Phase 2 done:
 
 - [ ] Code changes implemented per `plan.md`
+- [ ] Storybook stories created for any new components (sibling `.stories.tsx` files)
 - [ ] Unit/component tests written and passing
 - [ ] TypeScript and lint checks pass
 - [ ] `.beads/artifacts/<bead-id>/qa-checklist.md` created (see template below)
