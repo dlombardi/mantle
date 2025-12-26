@@ -14,6 +14,7 @@ import { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { trpc } from '@/lib/trpc';
 import { useAuth } from '@/hooks/use-auth';
+import { toast } from '@/components/ui/toast';
 
 const searchSchema = z.object({
   installation_id: z.coerce.number().optional(),
@@ -30,6 +31,10 @@ function GitHubSetupPage() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [selectedRepos, setSelectedRepos] = useState<number[]>([]);
+
+  // Auto-connect tracking (for ≤3 repos flow)
+  const [autoConnecting, setAutoConnecting] = useState(false);
+  const [autoConnected, setAutoConnected] = useState(false);
 
   // Verify the installation belongs to this user
   const {
@@ -56,10 +61,21 @@ function GitHubSetupPage() {
   // Mutation to connect selected repos
   const connectMutation = trpc.github.connectRepos.useMutation({
     onSuccess: (data) => {
+      setAutoConnected(true);
+
+      toast.success(
+        `Connected ${data.connected} repositor${data.connected !== 1 ? 'ies' : 'y'}`,
+        { description: 'Starting analysis...' }
+      );
+
       navigate({
         to: '/dashboard',
         search: { connected: data.connected },
       });
+    },
+    onError: () => {
+      setAutoConnecting(false);
+      // Error will show in existing error UI
     },
   });
 
@@ -72,6 +88,42 @@ function GitHubSetupPage() {
       });
     }
   }, [authLoading, user, navigate, installation_id]);
+
+  // Auto-connect when ≤3 available repos
+  useEffect(() => {
+    // Only trigger once, when repos are loaded and conditions are met
+    if (
+      repos &&
+      !autoConnected &&
+      !autoConnecting &&
+      verification?.valid &&
+      installation_id
+    ) {
+      const available = repos.filter((r) => !r.isConnected);
+
+      if (available.length === 0) {
+        // All repos already connected - redirect to dashboard
+        toast.info('All repositories already connected');
+        navigate({
+          to: '/dashboard',
+          replace: true,
+        });
+        return;
+      }
+
+      if (available.length <= 3) {
+        // Auto-connect all available repos
+        setAutoConnecting(true);
+        connectMutation.mutate({
+          installationId: installation_id,
+          repoIds: available.map((r) => r.id),
+        });
+      }
+    }
+  }, [repos, verification, installation_id, autoConnected, autoConnecting, navigate, connectMutation]);
+
+  // Compute available repos for UI
+  const availableRepos = repos?.filter((r) => !r.isConnected) ?? [];
 
   // Handle missing installation_id
   if (!installation_id) {
@@ -103,6 +155,24 @@ function GitHubSetupPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-orange mx-auto mb-4" />
           <p className="text-muted-foreground">Verifying installation...</p>
+        </div>
+      </main>
+    );
+  }
+
+  // Auto-connecting state (≤3 repos)
+  if (autoConnecting) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-orange mx-auto mb-4" />
+          <p className="text-lg font-medium mb-2">
+            Auto-connecting {availableRepos.length} repositor
+            {availableRepos.length !== 1 ? 'ies' : 'y'}...
+          </p>
+          <p className="text-sm text-muted-foreground">
+            This will only take a moment.
+          </p>
         </div>
       </main>
     );
