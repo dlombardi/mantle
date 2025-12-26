@@ -59,6 +59,7 @@ export {
 // File indexing utilities
 export {
   indexFileTree,
+  indexFileTreeWithTokens,
   detectLanguage,
   DEFAULT_PATH_EXCLUSIONS,
   BINARY_EXTENSIONS,
@@ -69,4 +70,15 @@ export {
   type IndexerOptions,
   type IndexerStats,
   type IndexerResult,
+  type IndexerResultWithTokens,
 } from './utils/file-indexer';
+
+// Token counting utilities
+export {
+  calculateTokenCount,
+  formatTokenCount,
+  createOversizedMessage,
+  TOKEN_LIMIT,
+  CHARS_PER_TOKEN,
+  type TokenCountResult,
+} from './utils/token-counter';

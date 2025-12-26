@@ -616,6 +616,62 @@ export function indexFileTree(
 }
 
 // ============================================
+// COMBINED WITH TOKEN COUNTING
+// ============================================
+
+import {
+  calculateTokenCount,
+  type TokenCountResult,
+} from './token-counter';
+
+/**
+ * Result of indexing with token counting.
+ */
+export interface IndexerResultWithTokens extends IndexerResult {
+  /** Token count calculation for limit checking */
+  tokenCount: TokenCountResult;
+}
+
+/**
+ * Index a file tree and calculate token count in one pass.
+ *
+ * This is the recommended entry point for ingestion jobs that need
+ * to check token limits before proceeding with extraction.
+ *
+ * @param files - Raw file tree from fetchFileTree()
+ * @param options - Configuration options
+ * @returns Indexed files, statistics, and token count
+ *
+ * @example
+ * ```typescript
+ * const tree = await fetchFileTree(octokit, owner, repo, 'main');
+ * const result = indexFileTreeWithTokens(tree.files);
+ *
+ * if (result.tokenCount.exceedsLimit) {
+ *   await db.update(repos).set({
+ *     ingestionStatus: 'failed',
+ *     lastError: createOversizedMessage(result.tokenCount),
+ *   });
+ *   return;
+ * }
+ *
+ * // Continue with ingestion...
+ * ```
+ */
+export function indexFileTreeWithTokens(
+  files: RepoFile[],
+  options?: IndexerOptions,
+): IndexerResultWithTokens {
+  const result = indexFileTree(files, options);
+  const tokenCount = calculateTokenCount(result.files);
+
+  return {
+    ...result,
+    tokenCount,
+  };
+}
+
+// ============================================
 // EXPORTS
 // ============================================
 

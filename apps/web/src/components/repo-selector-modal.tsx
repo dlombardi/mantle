@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Check, Loader2, Lock, ExternalLink, X } from 'lucide-react';
+import { Search, Check, Loader2, Lock, ExternalLink, X, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/button';
 import {
   Dialog,
@@ -19,6 +19,10 @@ export interface SelectorRepo {
   defaultBranch: string;
   private: boolean;
   status: RepoSelectorStatus;
+  /** Whether the repo exceeds the token limit (600k) */
+  tooLarge?: boolean;
+  /** Estimated token count (for display purposes) */
+  estimatedTokens?: number;
 }
 
 export interface RepoSelectorModalProps {
@@ -87,9 +91,10 @@ export function RepoSelectorModal({
     });
   };
 
-  // Select all available repos
+  // Select all available repos (excluding oversized ones)
   const selectAll = () => {
-    setSelectedIds(new Set(availableRepos.map((r) => r.id)));
+    const selectableRepos = availableRepos.filter((r) => !r.tooLarge);
+    setSelectedIds(new Set(selectableRepos.map((r) => r.id)));
   };
 
   // Handle connect
@@ -244,15 +249,16 @@ function RepoItem({
   onSelect?: () => void;
 }) {
   const isAnalyzing = repo.status === 'analyzing';
+  const isDisabled = connected || repo.tooLarge;
 
   return (
     <button
       type="button"
       onClick={onSelect}
-      disabled={connected}
+      disabled={isDisabled}
       className={cn(
         'w-full flex items-center gap-3 p-3 rounded-md border transition-all text-left',
-        connected
+        isDisabled
           ? 'bg-muted/50 border-border cursor-default opacity-70'
           : selected
             ? 'border-accent-orange bg-accent-orange/10'
@@ -265,12 +271,17 @@ function RepoItem({
           'flex h-4 w-4 shrink-0 items-center justify-center rounded border',
           connected
             ? 'bg-accent-orange border-accent-orange'
-            : selected
-              ? 'bg-accent-orange border-accent-orange'
-              : 'border-muted-foreground'
+            : repo.tooLarge
+              ? 'border-muted-foreground bg-muted'
+              : selected
+                ? 'bg-accent-orange border-accent-orange'
+                : 'border-muted-foreground'
         )}
       >
-        {(connected || selected) && (
+        {connected && (
+          <Check className="h-3 w-3 text-accent-orange-foreground" />
+        )}
+        {!connected && selected && !repo.tooLarge && (
           <Check className="h-3 w-3 text-accent-orange-foreground" />
         )}
       </div>
@@ -283,13 +294,19 @@ function RepoItem({
 
       {/* Badges */}
       <div className="flex items-center gap-2">
-        {repo.private && (
+        {repo.tooLarge && (
+          <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="h-3 w-3" />
+            Too large
+          </span>
+        )}
+        {repo.private && !repo.tooLarge && (
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <Lock className="h-3 w-3" />
             Private
           </span>
         )}
-        {connected && (
+        {connected && !repo.tooLarge && (
           <span
             className={cn(
               'text-xs',
