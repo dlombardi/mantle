@@ -55,3 +55,18 @@ export {
   type RateLimitInfo,
   type FetchOptions,
 } from './utils/github-content';
+
+// File indexing utilities
+export {
+  indexFileTree,
+  detectLanguage,
+  DEFAULT_PATH_EXCLUSIONS,
+  BINARY_EXTENSIONS,
+  EXTENSION_TO_LANGUAGE,
+  FILENAME_TO_LANGUAGE,
+  DEFAULT_MAX_FILE_SIZE,
+  type IndexedFile,
+  type IndexerOptions,
+  type IndexerStats,
+  type IndexerResult,
+} from './utils/file-indexer';
