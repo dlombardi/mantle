@@ -409,7 +409,7 @@ export async function fetchMultipleFiles(
     );
 
     batchResults.forEach((result, index) => {
-      const path = batch[index];
+      const path = batch[index]!;
       if (result.status === 'fulfilled') {
         results.set(path, result.value);
       } else {
