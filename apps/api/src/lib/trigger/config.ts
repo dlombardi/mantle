@@ -16,12 +16,12 @@ let configured = false;
 export function initTrigger(): void {
   const secretKey = process.env.TRIGGER_SECRET_KEY;
 
-  if (!secretKey) {
-    console.warn(
-      '⚠️  TRIGGER_SECRET_KEY not configured - background jobs disabled',
-    );
-    return;
-  }
+  // if (!secretKey) {
+  //   console.warn(
+  //     '⚠️  TRIGGER_SECRET_KEY not configured - background jobs disabled',
+  //   );
+  //   return;
+  // }
 
   configure({ secretKey });
   configured = true;
