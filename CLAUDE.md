@@ -356,6 +356,37 @@ This project uses a structured workflow: **Plan → Build → Verify**
 > **Full workflow documentation:** `.claude/skills/orchestrator-specialist/SKILL.md`
 > **QA harness reference:** `.claude/skills/qa-workflow/SKILL.md`
 
+### ⚠️ MANDATORY: Automatic Workflow Trigger
+
+**When ANY of these conditions are detected, AUTOMATICALLY execute the full three-phase workflow:**
+
+| Trigger | Example |
+|---------|---------|
+| User mentions working on a bead | "work on bead mantle-xyz", "implement mantle-abc" |
+| User runs `bd ready` and selects a bead | "bd ready" → picks from list |
+| User asks to "start" or "pick up" a bead | "start the next bead", "pick up where we left off" |
+| Bead ID appears in conversation | "let's do mantle-123" |
+
+**Automatic Execution Protocol:**
+
+```
+1. IMMEDIATELY read skill: .claude/skills/orchestrator-specialist/SKILL.md
+2. IMMEDIATELY read skill: .claude/skills/planning-workflow/SKILL.md
+3. Run: bd show <bead-id> && bd sync
+4. Execute Phase 1 → Phase 2 → Phase 3 in order
+5. Produce ALL artifacts:
+   - .beads/artifacts/<id>/plan.md
+   - .beads/artifacts/<id>/qa-checklist.md (with Actions: blocks!)
+   - .beads/artifacts/<id>/qa-report.md
+6. Output Bead Completion Summary (see orchestrator-specialist/SKILL.md)
+```
+
+**DO NOT:**
+- Skip directly to implementation without Phase 1 planning
+- Close the bead without Phase 3 verification
+- Create qa-checklist.md without `**Actions:**` blocks
+- Forget to output Bead Completion Summary
+
 ### Preview URLs (Stable)
 
 | Service | URL |
@@ -387,6 +418,19 @@ Feature branches: `https://mantle-git-<branch>-darienlombardi-2455s-projects.ver
 > - assertTextVisible: Expected text
 > - screenshot: result
 > ```
+
+### QA Harness Command (Phase 3)
+
+```bash
+bun run test:qa-harness -- \
+  --preview-url=https://mantle-git-preview-darienlombardi-2455s-projects.vercel.app \
+  --api-url=https://mantleapi-preview.up.railway.app \
+  --checklist=.beads/artifacts/<BEAD-ID>/qa-checklist.md \
+  --bead-id=<BEAD-ID> \
+  --skip-seed
+```
+
+Add `--headed` for debugging. See `.claude/skills/qa-workflow/SKILL.md` for full CLI reference.
 
 ---
 
