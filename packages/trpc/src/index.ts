@@ -89,3 +89,13 @@ export {
   type StoreFilesOptions,
   type StoreFilesResult,
 } from './utils/file-storage';
+
+// Content formatting utilities
+export {
+  formatFileForContext,
+  chunkFilesForContext,
+  type FormattedFile,
+  type FormatOptions,
+  type ContextChunk,
+  type ChunkingResult,
+} from './utils/content-formatter';
