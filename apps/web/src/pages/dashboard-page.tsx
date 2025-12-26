@@ -222,7 +222,10 @@ export function DashboardPage() {
                     // TODO: Navigate to repo settings
                     toast.info('Repo settings coming soon');
                   }}
-                  onDisconnect={() => setDisconnectingRepo(repo)}
+                  onDisconnect={() => {
+                    console.log('onDisconnect called for repo:', repo.fullName);
+                    setDisconnectingRepo(repo);
+                  }}
                   onRetry={() => triggerIngestionMutation.mutate({ id: repo.id })}
                 />
               ))}
@@ -252,25 +255,28 @@ export function DashboardPage() {
       />
 
       {/* Disconnect confirmation dialog */}
-      {disconnectingRepo && (
-        <ConfirmDialog
-          open={!!disconnectingRepo}
-          onOpenChange={(open) => !open && setDisconnectingRepo(null)}
-          title={`Disconnect ${disconnectingRepo.fullName.split('/')[1]}?`}
-          description="This action cannot be undone."
-          confirmText={disconnectingRepo.fullName.split('/')[1]}
-          confirmLabel={`Type "${disconnectingRepo.fullName.split('/')[1]}" to confirm:`}
-          buttonLabel="Disconnect"
-          onConfirm={() => disconnectMutation.mutate({ id: disconnectingRepo.id })}
-          loading={disconnectMutation.isPending}
-          destructive
-          deletionItems={[
-            'All extracted patterns',
-            'Violation history',
-            'Analysis data and evidence',
-          ]}
-        />
-      )}
+      {disconnectingRepo && (() => {
+        const repoName = disconnectingRepo.fullName.split('/')[1] ?? disconnectingRepo.fullName;
+        return (
+          <ConfirmDialog
+            open={!!disconnectingRepo}
+            onOpenChange={(open) => !open && setDisconnectingRepo(null)}
+            title={`Disconnect ${repoName}?`}
+            description="This action cannot be undone."
+            confirmText={repoName}
+            confirmLabel={`Type "${repoName}" to confirm:`}
+            buttonLabel="Disconnect"
+            onConfirm={() => disconnectMutation.mutate({ id: disconnectingRepo.id })}
+            loading={disconnectMutation.isPending}
+            destructive
+            deletionItems={[
+              'All extracted patterns',
+              'Violation history',
+              'Analysis data and evidence',
+            ]}
+          />
+        );
+      })()}
     </div>
   );
 }

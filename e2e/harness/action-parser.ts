@@ -49,7 +49,7 @@ export type ActionType =
   | 'wait'
   | 'screenshot';
 
-export type ElementRole = 'button' | 'link' | 'textbox' | 'checkbox' | 'text' | 'heading' | 'img';
+export type ElementRole = 'button' | 'link' | 'textbox' | 'checkbox' | 'text' | 'heading' | 'img' | 'menuitem';
 
 export type LoadState = 'load' | 'domcontentloaded' | 'networkidle';
 
@@ -212,7 +212,7 @@ export function parseAction(line: string): Action {
  */
 function parseClickAction(argument: string): ClickAction {
   // Match: role "label" pattern
-  const roleMatch = argument.match(/^(button|link|textbox|checkbox|heading|img)\s+"([^"]+)"$/);
+  const roleMatch = argument.match(/^(button|link|textbox|checkbox|heading|img|menuitem)\s+"([^"]+)"$/);
   if (roleMatch) {
     const [, role, name] = roleMatch;
     return {
@@ -254,7 +254,7 @@ function parseElementAssertAction(
   argument: string,
   type: 'assertElementVisible' | 'assertElementNotVisible',
 ): AssertElementVisibleAction | AssertElementNotVisibleAction {
-  const match = argument.match(/^(button|link|textbox|checkbox|heading|img)\s+"([^"]+)"$/);
+  const match = argument.match(/^(button|link|textbox|checkbox|heading|img|menuitem)\s+"([^"]+)"$/);
   if (!match) {
     throw new Error(`Invalid element assertion syntax: ${argument}. Expected: role "Label"`);
   }
