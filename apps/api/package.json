@@ -20,6 +20,7 @@
     "@hono/zod-validator": "^0.4.2",
     "@mantle/db": "workspace:*",
     "@mantle/trpc": "workspace:*",
+    "@octokit/webhooks-methods": "^6.0.0",
     "@supabase/supabase-js": "^2.47.10",
     "@trigger.dev/sdk": "^3.3.0",
     "drizzle-orm": "^0.45.1",

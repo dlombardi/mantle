@@ -19,6 +19,7 @@ import { healthRoutes } from './routes/health';
 import { exampleRoutes } from './routes/example';
 import { seedRoutes } from './routes/seed';
 import { testSessionRoutes } from './routes/test-session';
+import { githubWebhookRoutes } from './routes/github-webhook';
 import { appRouter, createContext, type User } from '@mantle/trpc';
 
 /**
@@ -109,6 +110,9 @@ export function createApp(options: { enableLogger?: boolean } = {}) {
 
   // Test session routes (dev/preview only - for QA automation)
   app.route('/test/session', testSessionRoutes);
+
+  // GitHub webhook endpoint (signature verified)
+  app.route('/github/webhook', githubWebhookRoutes);
 
   // tRPC routes - type-safe RPC endpoints
   app.use(
