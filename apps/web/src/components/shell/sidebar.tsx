@@ -1,10 +1,9 @@
 import { Link, useRouterState } from '@tanstack/react-router';
-import { Home, FolderGit2, Sparkles, Settings } from 'lucide-react';
+import { Home, Sparkles, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: Home },
-  { to: '/repos', label: 'Repositories', icon: FolderGit2 },
   { to: '/patterns', label: 'Patterns', icon: Sparkles },
   { to: '/settings', label: 'Settings', icon: Settings },
 ] as const;
