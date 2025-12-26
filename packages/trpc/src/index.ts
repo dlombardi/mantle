@@ -82,3 +82,10 @@ export {
   CHARS_PER_TOKEN,
   type TokenCountResult,
 } from './utils/token-counter';
+
+// File storage utilities
+export {
+  storeIndexedFiles,
+  type StoreFilesOptions,
+  type StoreFilesResult,
+} from './utils/file-storage';
