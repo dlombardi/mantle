@@ -16,12 +16,16 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// Mock the database client by default
-vi.mock('@/lib/db', () => ({
-  getDb: vi.fn(),
-  closeDb: vi.fn(),
-  dbHealthCheck: vi.fn().mockResolvedValue({ connected: true }),
-}));
+// Mock the database client by default (preserve schema exports from @mantle/db)
+vi.mock('@/lib/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/db')>();
+  return {
+    ...actual,
+    getDb: vi.fn(),
+    closeDb: vi.fn(),
+    dbHealthCheck: vi.fn().mockResolvedValue({ connected: true }),
+  };
+});
 
 // Mock Trigger.dev
 vi.mock('@/lib/trigger', () => ({

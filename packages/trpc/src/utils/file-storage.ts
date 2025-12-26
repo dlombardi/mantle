@@ -18,8 +18,9 @@ import type { IndexedFile } from './file-indexer';
 // TYPES
 // ============================================
 
-// Match the pattern used in routers (see repos.router.ts:15)
-type DrizzleDb = PostgresJsDatabase;
+// Accept any PostgresJsDatabase (with or without schema type parameter)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DrizzleDb = PostgresJsDatabase<any>;
 
 export interface StoreFilesOptions {
   /** UUID of the repo to store files for */
