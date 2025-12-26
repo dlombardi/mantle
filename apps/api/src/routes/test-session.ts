@@ -74,7 +74,8 @@ testSessionRoutes.post('/', async (c) => {
       {
         error: {
           code: 'FORBIDDEN',
-          message: 'Test session endpoint is only available in development and preview environments',
+          message:
+            'Test session endpoint is only available in development and preview environments',
         },
       },
       403,
@@ -95,34 +96,39 @@ testSessionRoutes.post('/', async (c) => {
     const storageKey = `sb-${projectRef}-auth-token`;
 
     // Check if test user exists
-    const { data: existingUser } = await supabase.auth.admin.getUserById(TEST_USER.id);
+    const { data: existingUser } = await supabase.auth.admin.getUserById(
+      TEST_USER.id,
+    );
 
     let userId = TEST_USER.id;
 
     if (!existingUser.user) {
       // Create the test user with admin API
-      const { data: createData, error: createError } = await supabase.auth.admin.createUser({
-        id: TEST_USER.id,
-        email: TEST_USER.email,
-        email_confirm: true, // Skip email verification
-        user_metadata: {
-          github_id: TEST_USER.githubId,
-          user_name: TEST_USER.githubUsername,
-          avatar_url: `https://avatars.githubusercontent.com/u/${TEST_USER.githubId}`,
-          provider_id: String(TEST_USER.githubId),
-          full_name: 'Test User',
-        },
-        app_metadata: {
-          provider: 'github',
-          providers: ['github'],
-        },
-      });
+      const { data: createData, error: createError } =
+        await supabase.auth.admin.createUser({
+          id: TEST_USER.id,
+          email: TEST_USER.email,
+          email_confirm: true, // Skip email verification
+          user_metadata: {
+            github_id: TEST_USER.githubId,
+            user_name: TEST_USER.githubUsername,
+            avatar_url: `https://avatars.githubusercontent.com/u/${TEST_USER.githubId}`,
+            provider_id: String(TEST_USER.githubId),
+            full_name: 'Test User',
+          },
+          app_metadata: {
+            provider: 'github',
+            providers: ['github'],
+          },
+        });
 
       if (createError) {
         // If user exists with different ID, try to find them
         if (createError.message.includes('already been registered')) {
           const { data: listData } = await supabase.auth.admin.listUsers();
-          const foundUser = listData.users.find((u) => u.email === TEST_USER.email);
+          const foundUser = listData.users.find(
+            (u) => u.email === TEST_USER.email,
+          );
           if (foundUser) {
             userId = foundUser.id;
           } else {
@@ -138,14 +144,15 @@ testSessionRoutes.post('/', async (c) => {
 
     // Generate a magic link to create a session
     // We use 'magiclink' type which creates a session when the link is "used"
-    const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: TEST_USER.email,
-      options: {
-        // Short expiry since we're using it immediately
-        redirectTo: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
-      },
-    });
+    const { data: linkData, error: linkError } =
+      await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: TEST_USER.email,
+        options: {
+          // Short expiry since we're using it immediately
+          redirectTo: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
+        },
+      });
 
     if (linkError) {
       throw linkError;
@@ -156,11 +163,12 @@ testSessionRoutes.post('/', async (c) => {
     }
 
     // Verify the token to get a session
-    const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
-      email: TEST_USER.email,
-      token: linkData.properties.hashed_token,
-      type: 'magiclink',
-    });
+    const { data: verifyData, error: verifyError } =
+      await supabase.auth.verifyOtp({
+        email: TEST_USER.email,
+        token: linkData.properties.hashed_token,
+        type: 'magiclink',
+      });
 
     if (verifyError) {
       // verifyOtp doesn't work with hashed_token directly
@@ -173,10 +181,11 @@ testSessionRoutes.post('/', async (c) => {
       });
 
       // Now sign in with password to get a real session
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: TEST_USER.email,
-        password: testPassword,
-      });
+      const { data: signInData, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email: TEST_USER.email,
+          password: testPassword,
+        });
 
       if (signInError || !signInData.session) {
         throw signInError ?? new Error('Failed to create session');
@@ -206,7 +215,8 @@ testSessionRoutes.post('/', async (c) => {
           access_token: session.access_token,
           refresh_token: session.refresh_token,
           expires_in: session.expires_in ?? 3600,
-          expires_at: session.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
+          expires_at:
+            session.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
           token_type: 'bearer',
           user: {
             id: session.user.id,
@@ -282,7 +292,8 @@ testSessionRoutes.get('/', async (c) => {
       {
         error: {
           code: 'FORBIDDEN',
-          message: 'Test session endpoint is only available in development and preview environments',
+          message:
+            'Test session endpoint is only available in development and preview environments',
         },
       },
       403,
@@ -291,7 +302,8 @@ testSessionRoutes.get('/', async (c) => {
 
   return c.json({
     available: true,
-    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
+    environment:
+      process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
     testUser: {
       email: TEST_USER.email,
       githubUsername: TEST_USER.githubUsername,

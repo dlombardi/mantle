@@ -15,7 +15,7 @@ export function getGitHubApp(): App {
 
     if (!appId || !privateKey) {
       throw new Error(
-        'GitHub App credentials not configured. Set GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY.'
+        'GitHub App credentials not configured. Set GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY.',
       );
     }
 

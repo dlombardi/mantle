@@ -114,7 +114,8 @@ healthRoutes.get('/ready', async (c) => {
 healthRoutes.get('/version', (c) => {
   const response: VersionResponse = {
     version: process.env.npm_package_version ?? '0.0.0',
-    environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
+    environment:
+      process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
     commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'local',
   };
   return c.json(response);

@@ -31,7 +31,10 @@ function isSeedableEnvironment(): boolean {
  * Insert seed data into the database with upsert behavior.
  * This allows re-running scenarios without duplicate key errors.
  */
-async function insertSeedData(db: ReturnType<typeof getDb>, data: SeedData): Promise<void> {
+async function insertSeedData(
+  db: ReturnType<typeof getDb>,
+  data: SeedData,
+): Promise<void> {
   // Insert users first (no FK dependencies)
   if (data.users && data.users.length > 0) {
     for (const user of data.users) {
@@ -122,7 +125,8 @@ seedRoutes.post('/', zValidator('json', seedRequestSchema), async (c) => {
       {
         error: {
           code: 'FORBIDDEN',
-          message: 'Seed endpoint is only available in development and preview environments',
+          message:
+            'Seed endpoint is only available in development and preview environments',
         },
       },
       403,
@@ -191,7 +195,8 @@ seedRoutes.get('/', async (c) => {
       {
         error: {
           code: 'FORBIDDEN',
-          message: 'Seed endpoint is only available in development and preview environments',
+          message:
+            'Seed endpoint is only available in development and preview environments',
         },
       },
       403,
@@ -204,9 +209,10 @@ seedRoutes.get('/', async (c) => {
 
     return c.json({
       scenarios,
-      environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
+      environment:
+        process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
     });
-  } catch (error) {
+  } catch (_error) {
     return c.json(
       {
         error: {
@@ -229,7 +235,8 @@ seedRoutes.delete('/', async (c) => {
       {
         error: {
           code: 'FORBIDDEN',
-          message: 'Seed endpoint is only available in development and preview environments',
+          message:
+            'Seed endpoint is only available in development and preview environments',
         },
       },
       403,
@@ -251,7 +258,7 @@ seedRoutes.delete('/', async (c) => {
       success: true,
       message: 'Database reset to empty state',
     });
-  } catch (error) {
+  } catch (_error) {
     return c.json(
       {
         error: {

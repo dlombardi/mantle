@@ -35,7 +35,10 @@ async function extractUserFromRequest(req: Request): Promise<User | null> {
 
   try {
     const supabase = getSupabaseClient();
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
 
     if (error || !user) {
       return null;
@@ -90,7 +93,8 @@ export function createApp(options: { enableLogger?: boolean } = {}) {
     return c.json({
       message: 'Mantle API',
       version: '0.1.0',
-      environment: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
+      environment:
+        process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
     });
   });
 
