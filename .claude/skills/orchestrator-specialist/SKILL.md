@@ -198,6 +198,26 @@ Before transitioning from Phase 2 → Phase 3, verify these artifacts exist:
 
 **If `qa-checklist.md` is missing**, the builder (domain skill) must create it before Phase 3 can begin.
 
+> **CRITICAL: qa-checklist.md Format**
+>
+> The checklist MUST use the machine-parseable format with `**Actions:**` blocks.
+> **Template:** `.claude/skills/qa-workflow/references/qa-checklist-template.md`
+>
+> Without `**Actions:**` blocks, the QA harness reports 0/0 tests and silently skips all verifications.
+>
+> ```markdown
+> ### AC1: Feature Works
+>
+> **Steps:** ...
+> **Expected Result:** ...
+>
+> **Actions:**          ← REQUIRED
+> - navigate: /path
+> - waitForLoadState: networkidle
+> - assertTextVisible: Expected text
+> - screenshot: ac1-result
+> ```
+
 ### Bead Closure Rules
 
 > ⚠️ **CRITICAL: NEVER use `bd close` without Phase 3 completion.**

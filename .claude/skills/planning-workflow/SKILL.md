@@ -76,6 +76,13 @@ PLAN: .beads/artifacts/<bead-id>/plan.md
 TASK: Implement according to plan, produce qa-checklist.md
 ```
 
+> **CRITICAL: qa-checklist.md Format**
+>
+> Phase 2 MUST produce a checklist with machine-parseable `**Actions:**` blocks.
+> **Use template:** `.claude/skills/qa-workflow/references/qa-checklist-template.md`
+>
+> Without `**Actions:**`, the QA harness reports 0/0 tests and Phase 3 silently fails.
+
 ---
 
 ## Common Planning Patterns

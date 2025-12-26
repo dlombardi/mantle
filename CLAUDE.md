@@ -375,6 +375,19 @@ Feature branches: `https://mantle-git-<branch>-darienlombardi-2455s-projects.ver
 
 > ⚠️ **CRITICAL:** Never `bd close` without Phase 3 completion. Unit tests ≠ QA verification.
 
+> ⚠️ **qa-checklist.md Format:** The checklist MUST include `**Actions:**` blocks with machine-parseable commands.
+> Without Actions, the QA harness reports **0/0 tests** and silently skips verification.
+> **Template:** `.claude/skills/qa-workflow/references/qa-checklist-template.md`
+>
+> ```markdown
+> ### AC1: Feature Title
+> **Actions:**
+> - navigate: /path
+> - waitForLoadState: networkidle
+> - assertTextVisible: Expected text
+> - screenshot: result
+> ```
+
 ---
 
 ## Documentation Lookup
