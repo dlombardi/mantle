@@ -39,3 +39,19 @@ export {
   middleware,
   mergeRouters,
 } from './trpc';
+
+// GitHub utilities
+export { getGitHubApp, getInstallationOctokit } from './utils/github';
+export {
+  fetchFileTree,
+  fetchDirectoryContents,
+  fetchFileContent,
+  fetchBlobContent,
+  fetchMultipleFiles,
+  checkRateLimit,
+  extractRateLimitInfo,
+  type RepoFile,
+  type FileContent,
+  type RateLimitInfo,
+  type FetchOptions,
+} from './utils/github-content';
