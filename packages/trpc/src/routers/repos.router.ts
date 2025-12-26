@@ -6,7 +6,13 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { eq, desc } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
+import { repos } from '@mantle/db';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+
+// Type for the database
+type DrizzleDb = PostgresJsDatabase;
 
 /**
  * Pagination input schema - reusable across list endpoints.
@@ -36,35 +42,86 @@ const connectRepoInput = z.object({
 export const reposRouter = router({
   /**
    * List repositories for the authenticated user.
+   * Returns repos with status mapped for UI display.
    *
    * @example
    * const { data } = trpc.repos.list.useQuery({ page: 1, limit: 20 });
    */
   list: protectedProcedure
     .input(paginationInput)
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const { page, limit } = input;
-      // ctx.db and offset will be used when database query is implemented
+      const offset = (page - 1) * limit;
+      const db = ctx.db as DrizzleDb;
 
-      // TODO: Implement actual database query
-      // const repos = await ctx.db.query.repos.findMany({
-      //   where: eq(repos.userId, ctx.user.id),
-      //   limit,
-      //   offset,
-      //   orderBy: [desc(repos.createdAt)],
-      // });
+      // Fetch repos for this user
+      const userRepos = await db
+        .select()
+        .from(repos)
+        .where(eq(repos.userId, ctx.user.id))
+        .orderBy(desc(repos.createdAt))
+        .limit(limit)
+        .offset(offset);
 
-      // Placeholder response
+      // Map database status to UI status
+      const items = userRepos.map((repo) => {
+        // Determine display status based on ingestion + extraction status
+        let status: 'pending' | 'analyzing' | 'ready' | 'error';
+        let progress: { percentage: number; currentStep: string } | undefined;
+        let error: { message: string } | undefined;
+
+        if (repo.ingestionStatus === 'failed' || repo.extractionStatus === 'failed') {
+          status = 'error';
+          error = { message: repo.lastError || 'Analysis failed' };
+        } else if (repo.ingestionStatus === 'pending') {
+          status = 'pending';
+        } else if (repo.ingestionStatus === 'ingesting') {
+          status = 'analyzing';
+          progress = { percentage: 25, currentStep: 'Indexing files...' };
+        } else if (repo.extractionStatus === 'extracting') {
+          status = 'analyzing';
+          progress = { percentage: 75, currentStep: 'Extracting patterns...' };
+        } else if (repo.extractionStatus === 'extracted') {
+          status = 'ready';
+        } else {
+          // ingestion completed (ingested) but extraction pending
+          status = 'analyzing';
+          progress = { percentage: 50, currentStep: 'Analyzing git history...' };
+        }
+
+        return {
+          id: repo.id,
+          fullName: repo.githubFullName,
+          githubUrl: `https://github.com/${repo.githubFullName}`,
+          status,
+          // Stats for ready repos
+          ...(status === 'ready' && {
+            stats: {
+              authoritative: 0, // TODO: Query from patterns table
+              candidates: repo.patternCount ?? 0,
+              caught: 0, // TODO: Query from violations table
+              lastAnalyzed: repo.lastExtractedAt ?? repo.updatedAt,
+            },
+          }),
+          // Progress for analyzing repos
+          ...(status === 'analyzing' && progress && { progress }),
+          // Error for failed repos
+          ...(status === 'error' && error && { error }),
+        };
+      });
+
+      // Get total count
+      const totalResult = await db
+        .select({ count: repos.id })
+        .from(repos)
+        .where(eq(repos.userId, ctx.user.id));
+      const total = totalResult.length;
+
       return {
-        items: [] as Array<{
-          id: string;
-          githubFullName: string;
-          ingestionStatus: string;
-          patternCount: number | null;
-        }>,
+        items,
         page,
         limit,
-        total: 0,
+        total,
       };
     }),
 

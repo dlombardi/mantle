@@ -222,4 +222,29 @@ export const githubRouter = router({
         });
       }
     }),
+
+  /**
+   * Get the user's GitHub installation info.
+   * Returns installationId if the user has connected repos, null otherwise.
+   */
+  getInstallation: protectedProcedure.query(async ({ ctx }) => {
+    const db = ctx.db as DrizzleDb;
+
+    // Get the first repo to find the installation ID
+    const userRepo = await db
+      .select({ installationId: repos.installationId })
+      .from(repos)
+      .where(eq(repos.userId, ctx.user.id))
+      .limit(1);
+
+    const firstRepo = userRepo[0];
+    if (!firstRepo) {
+      return { hasInstallation: false, installationId: null };
+    }
+
+    return {
+      hasInstallation: true,
+      installationId: firstRepo.installationId,
+    };
+  }),
 });
