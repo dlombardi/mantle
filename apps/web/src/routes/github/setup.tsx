@@ -49,6 +49,16 @@ function GitHubSetupPage() {
     }
   );
 
+  // Discover and link installations for this user (runs after OAuth)
+  const discoverMutation = trpc.installations.discoverInstallations.useMutation();
+
+  // Trigger discovery once verification succeeds
+  useEffect(() => {
+    if (verification?.valid && !discoverMutation.isPending && !discoverMutation.isSuccess) {
+      discoverMutation.mutate();
+    }
+  }, [verification?.valid, discoverMutation]);
+
   // List repos accessible to this installation
   const { data: repos, isLoading: loadingRepos } =
     trpc.github.listInstallationRepos.useQuery(

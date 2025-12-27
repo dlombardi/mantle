@@ -4,7 +4,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { trpc } from '@/lib/trpc';
 import { RepoCard, type Repo } from '@/components/ui/repo-card';
 import { GitHubConnectModal } from '@/components/github-connect-modal';
-import { RepoSelectorModal, type SelectorRepo } from '@/components/repo-selector-modal';
+import {
+  RepoSelectorModal,
+  type SelectorRepo,
+  type ReposByInstallation,
+} from '@/components/repo-selector-modal';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
@@ -27,20 +31,20 @@ export function DashboardPage() {
     refetch: refetchRepos,
   } = trpc.repos.list.useQuery({ page: 1, limit: 20 });
 
-  // Check if user has GitHub App installed
-  const { data: installation } = trpc.github.getInstallation.useQuery();
-
   // Get installation URL for redirecting to GitHub
   const { data: installationUrl } = trpc.github.getInstallationUrl.useQuery();
 
-  // Fetch repos from GitHub installation (only when selector is open)
+  // Check if user has any linked installations
+  const { data: installationsData } = trpc.installations.list.useQuery();
+  const hasInstallations = (installationsData?.installations?.length ?? 0) > 0;
+
+  // Fetch available repos from all user's installations (only when selector is open)
   const {
-    data: installationRepos,
-    isLoading: installationReposLoading,
-  } = trpc.github.listInstallationRepos.useQuery(
-    { installationId: installation?.installationId ?? 0 },
-    { enabled: showRepoSelector && !!installation?.hasInstallation && !!installation.installationId }
-  );
+    data: availableReposData,
+    isLoading: availableReposLoading,
+  } = trpc.installations.listAvailableRepos.useQuery(undefined, {
+    enabled: showRepoSelector && hasInstallations,
+  });
 
   // Connect repos mutation
   const connectMutation = trpc.github.connectRepos.useMutation({
@@ -89,7 +93,7 @@ export function DashboardPage() {
 
   // Handle "+ Add Repo" click
   const handleAddRepo = () => {
-    if (installation?.hasInstallation) {
+    if (hasInstallations) {
       // User has GitHub App installed - show repo selector
       setShowRepoSelector(true);
     } else {
@@ -104,23 +108,28 @@ export function DashboardPage() {
     window.location.href = url;
   };
 
-  // Handle repo connection from selector
-  const handleConnectRepos = (selectedIds: number[]) => {
-    if (installation?.installationId) {
-      connectMutation.mutate({
-        installationId: installation.installationId,
-        repoIds: selectedIds,
+  // Handle repo connection from selector - now handles multiple installations
+  const handleConnectRepos = async (reposByInstallation: ReposByInstallation[]) => {
+    // Connect repos from each installation sequentially
+    for (const { installationId, repoIds } of reposByInstallation) {
+      await connectMutation.mutateAsync({
+        installationId,
+        repoIds,
       });
     }
   };
 
-  // Map installation repos to SelectorRepo format
-  const selectorRepos: SelectorRepo[] = (installationRepos ?? []).map((repo) => ({
-    id: repo.id,
+  // Map available repos to SelectorRepo format (now from all installations)
+  const selectorRepos: SelectorRepo[] = (availableReposData?.repos ?? []).map((repo) => ({
+    id: repo.githubId,
     fullName: repo.fullName,
-    defaultBranch: repo.defaultBranch,
     private: repo.private,
     status: repo.isConnected ? 'connected' : 'available',
+    // Include installation info for grouping in the UI
+    installationId: repo.installationId,
+    installationAccount: repo.installationAccount,
+    installationType: repo.installationType as 'User' | 'Organization',
+    installationAvatarUrl: repo.installationAvatarUrl,
   }));
 
   // Map repo data to RepoCard Repo type
@@ -248,7 +257,7 @@ export function DashboardPage() {
         open={showRepoSelector}
         onOpenChange={setShowRepoSelector}
         repos={selectorRepos}
-        loading={installationReposLoading}
+        loading={availableReposLoading}
         onConnect={handleConnectRepos}
         connecting={connectMutation.isPending}
         permissionsUrl={`https://github.com/apps/${GITHUB_APP_NAME}/installations/new`}

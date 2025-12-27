@@ -13,6 +13,26 @@ import { getInstallationOctokit } from '../utils/github';
 import { repos } from '@mantle/db';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
+/**
+ * Trigger.dev tasks interface for ingestion.
+ * Set via setTriggerTasks() from apps/api during initialization.
+ * This avoids adding @trigger.dev/sdk as a trpc package dependency
+ * which causes drizzle-orm version conflicts.
+ */
+interface TriggerTasks {
+  trigger(taskId: string, payload: Record<string, unknown>): Promise<unknown>;
+}
+
+let triggerTasks: TriggerTasks | null = null;
+
+/**
+ * Set the trigger.dev tasks instance for ingestion triggering.
+ * Called from apps/api during initialization.
+ */
+export function setTriggerTasks(tasks: TriggerTasks): void {
+  triggerTasks = tasks;
+}
+
 // Type for the database (context.db is typed as unknown)
 type DrizzleDb = PostgresJsDatabase;
 
@@ -209,9 +229,28 @@ export const githubRouter = router({
             fullName: repos.githubFullName,
           });
 
+        // Trigger ingestion for each connected repo (if trigger.dev is configured)
+        const triggered: string[] = [];
+        if (triggerTasks) {
+          for (const repo of insertedRepos) {
+            try {
+              await triggerTasks.trigger('ingest-repo', {
+                repoId: repo.id,
+              });
+              triggered.push(repo.id);
+              console.log(`Triggered ingestion for ${repo.fullName} (${repo.id})`);
+            } catch (error) {
+              console.error(`Failed to trigger ingestion for ${repo.fullName}:`, error);
+            }
+          }
+        } else {
+          console.log('Trigger.dev not configured - skipping ingestion trigger');
+        }
+
         return {
           connected: insertedRepos.length,
           repos: insertedRepos,
+          ingestionTriggered: triggered.length,
         };
       } catch (error) {
         if (error instanceof TRPCError) throw error;

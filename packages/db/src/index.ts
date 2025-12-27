@@ -27,6 +27,8 @@ import type {
   violations,
   backtestViolations,
   patternEvolutionRequests,
+  githubInstallations,
+  installationMembers,
 } from './schema';
 
 // User types
@@ -76,6 +78,14 @@ export type InsertBacktestViolation = InferInsertModel<typeof backtestViolations
 // PatternEvolutionRequest types
 export type PatternEvolutionRequest = InferSelectModel<typeof patternEvolutionRequests>;
 export type InsertPatternEvolutionRequest = InferInsertModel<typeof patternEvolutionRequests>;
+
+// GithubInstallation types
+export type GithubInstallation = InferSelectModel<typeof githubInstallations>;
+export type InsertGithubInstallation = InferInsertModel<typeof githubInstallations>;
+
+// InstallationMember types
+export type InstallationMember = InferSelectModel<typeof installationMembers>;
+export type InsertInstallationMember = InferInsertModel<typeof installationMembers>;
 
 // ============================================
 // SEED DATA TYPE (for test-utils scenarios)

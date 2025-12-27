@@ -16,13 +16,24 @@ export type RepoSelectorStatus = 'available' | 'connected' | 'analyzing';
 export interface SelectorRepo {
   id: number;
   fullName: string;
-  defaultBranch: string;
+  defaultBranch?: string;
   private: boolean;
   status: RepoSelectorStatus;
   /** Whether the repo exceeds the token limit (600k) */
   tooLarge?: boolean;
   /** Estimated token count (for display purposes) */
   estimatedTokens?: number;
+  /** Installation this repo belongs to (for multi-installation support) */
+  installationId?: number;
+  installationAccount?: string;
+  installationType?: 'User' | 'Organization';
+  installationAvatarUrl?: string | null;
+}
+
+/** Group of repos by installation, used for connect callback */
+export interface ReposByInstallation {
+  installationId: number;
+  repoIds: number[];
 }
 
 export interface RepoSelectorModalProps {
@@ -34,8 +45,8 @@ export interface RepoSelectorModalProps {
   repos: SelectorRepo[];
   /** Whether repos are loading */
   loading?: boolean;
-  /** Called when user clicks "Connect & Analyze" */
-  onConnect: (selectedRepoIds: number[]) => void;
+  /** Called when user clicks "Connect & Analyze" - receives repos grouped by installation */
+  onConnect: (reposByInstallation: ReposByInstallation[]) => void;
   /** Whether the connect action is in progress */
   connecting?: boolean;
   /** URL to update GitHub permissions */
@@ -78,6 +89,18 @@ export function RepoSelectorModal({
   const availableRepos = filteredRepos.filter((r) => r.status === 'available');
   const connectedRepos = filteredRepos.filter((r) => r.status !== 'available');
 
+  // Group available repos by installation account for better organization
+  const availableByInstallation = useMemo(() => {
+    const grouped = new Map<string, SelectorRepo[]>();
+    for (const repo of availableRepos) {
+      const key = repo.installationAccount || 'Unknown';
+      const existing = grouped.get(key) || [];
+      existing.push(repo);
+      grouped.set(key, existing);
+    }
+    return Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [availableRepos]);
+
   // Toggle selection
   const toggleSelection = (id: number) => {
     setSelectedIds((prev) => {
@@ -97,9 +120,23 @@ export function RepoSelectorModal({
     setSelectedIds(new Set(selectableRepos.map((r) => r.id)));
   };
 
-  // Handle connect
+  // Handle connect - group selected repos by their installation
   const handleConnect = () => {
-    onConnect(Array.from(selectedIds));
+    const byInstallation = new Map<number, number[]>();
+
+    for (const repo of repos) {
+      if (selectedIds.has(repo.id) && repo.installationId) {
+        const existing = byInstallation.get(repo.installationId) || [];
+        existing.push(repo.id);
+        byInstallation.set(repo.installationId, existing);
+      }
+    }
+
+    const grouped: ReposByInstallation[] = Array.from(byInstallation.entries()).map(
+      ([installationId, repoIds]) => ({ installationId, repoIds })
+    );
+
+    onConnect(grouped);
   };
 
   // Reset on close
@@ -143,7 +180,7 @@ export function RepoSelectorModal({
             </div>
           ) : (
             <>
-              {/* Available repos */}
+              {/* Available repos - grouped by installation */}
               {availableRepos.length > 0 && (
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-2">
@@ -157,16 +194,51 @@ export function RepoSelectorModal({
                       Select all
                     </button>
                   </div>
-                  <div className="space-y-2">
-                    {availableRepos.map((repo) => (
-                      <RepoItem
-                        key={repo.id}
-                        repo={repo}
-                        selected={selectedIds.has(repo.id)}
-                        onSelect={() => toggleSelection(repo.id)}
-                      />
-                    ))}
-                  </div>
+                  {/* Group by installation when multiple sources */}
+                  {availableByInstallation.length > 1 ? (
+                    <div className="space-y-4">
+                      {availableByInstallation.map(([account, accountRepos]) => (
+                        <div key={account}>
+                          <div className="flex items-center gap-2 mb-2">
+                            {accountRepos[0]?.installationAvatarUrl && (
+                              <img
+                                src={accountRepos[0].installationAvatarUrl}
+                                alt=""
+                                className="h-4 w-4 rounded-full"
+                              />
+                            )}
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {account}
+                              {accountRepos[0]?.installationType === 'Organization' && (
+                                <span className="ml-1 text-[10px] bg-muted px-1 py-0.5 rounded">org</span>
+                              )}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {accountRepos.map((repo) => (
+                              <RepoItem
+                                key={repo.id}
+                                repo={repo}
+                                selected={selectedIds.has(repo.id)}
+                                onSelect={() => toggleSelection(repo.id)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableRepos.map((repo) => (
+                        <RepoItem
+                          key={repo.id}
+                          repo={repo}
+                          selected={selectedIds.has(repo.id)}
+                          onSelect={() => toggleSelection(repo.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

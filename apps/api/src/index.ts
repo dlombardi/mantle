@@ -10,9 +10,14 @@
 import { closeDb } from './lib/db';
 import { initTrigger } from './lib/trigger';
 import { createApp } from './app';
+import { tasks } from '@trigger.dev/sdk/v3';
+import { setTriggerTasks } from '@mantle/trpc';
 
 // Initialize Trigger.dev SDK (only for local development)
 initTrigger();
+
+// Wire up trigger.dev tasks for tRPC routers
+setTriggerTasks(tasks);
 
 // Create app with logger enabled for local development
 const app = createApp({ enableLogger: true });

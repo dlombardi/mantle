@@ -7,6 +7,7 @@
 
 export { reposRouter } from './repos.router';
 export { patternsRouter } from './patterns.router';
+export { installationsRouter } from './installations.router';
 
 // Future routers will be exported here:
 // export { violationsRouter } from './violations.router';

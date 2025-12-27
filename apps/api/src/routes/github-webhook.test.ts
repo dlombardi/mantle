@@ -1,7 +1,7 @@
 /**
  * Tests for GitHub webhook endpoint.
  *
- * Tests signature verification, event handling, and security logging.
+ * Tests signature verification, event handling, job triggering, and security logging.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -13,8 +13,65 @@ vi.mock('@octokit/webhooks-methods', () => ({
   verify: vi.fn(),
 }));
 
-// Import the mocked module
+// Mock @trigger.dev/sdk/v3
+vi.mock('@trigger.dev/sdk/v3', () => ({
+  tasks: {
+    trigger: vi.fn().mockResolvedValue({ id: 'test-run-id' }),
+  },
+}));
+
+// Mock database - getDb returns a mock db with various operations
+const mockDbSelect = vi.fn();
+const mockDbFrom = vi.fn();
+const mockDbWhere = vi.fn();
+const mockDbLimit = vi.fn();
+
+// Mock for insert operations (used by captureInstallation, autoLinkPersonalInstallation)
+const mockDbInsertReturning = vi.fn();
+const mockDbInsertOnConflict = vi.fn();
+const mockDbInsertValues = vi.fn();
+const mockDbInsert = vi.fn();
+const mockDbUpdate = vi.fn();
+const mockDbUpdateSet = vi.fn();
+const mockDbUpdateWhere = vi.fn();
+
+// Create a mock that can be both awaited and has .limit()
+const createWhereResult = (data: unknown[]) => {
+  const result = Promise.resolve(data);
+  (result as unknown as { limit: typeof mockDbLimit }).limit = mockDbLimit;
+  return result;
+};
+
+vi.mock('@/lib/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/db')>();
+  return {
+    ...actual,
+    getDb: vi.fn(() => ({
+      select: mockDbSelect.mockReturnValue({
+        from: mockDbFrom.mockReturnValue({
+          where: mockDbWhere,
+        }),
+      }),
+      insert: mockDbInsert.mockReturnValue({
+        values: mockDbInsertValues.mockReturnValue({
+          onConflictDoUpdate: mockDbInsertOnConflict.mockReturnValue({
+            returning: mockDbInsertReturning,
+          }),
+          returning: mockDbInsertReturning,
+        }),
+      }),
+      update: mockDbUpdate.mockReturnValue({
+        set: mockDbUpdateSet.mockReturnValue({
+          where: mockDbUpdateWhere,
+        }),
+      }),
+    })),
+  };
+});
+
+// Import the mocked modules
 import { verify } from '@octokit/webhooks-methods';
+import { tasks } from '@trigger.dev/sdk/v3';
 
 // Create test app with webhook routes
 const app = new Hono().route('/github/webhook', githubWebhookRoutes);
@@ -54,6 +111,14 @@ describe('GitHub Webhook Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('GITHUB_WEBHOOK_SECRET', 'test-webhook-secret');
+
+    // Default mock returns for installation capture operations
+    mockDbInsertReturning.mockResolvedValue([{ id: 'mock-installation-uuid' }]);
+    mockDbLimit.mockResolvedValue([]);  // No existing installation members by default
+    mockDbUpdateWhere.mockResolvedValue([]);
+
+    // Default: mockDbWhere returns empty array (can be awaited AND has .limit())
+    mockDbWhere.mockReturnValue(createWhereResult([]));
   });
 
   describe('Signature Verification', () => {
@@ -253,8 +318,14 @@ describe('GitHub Webhook Routes', () => {
       ],
     };
 
-    it('should handle installation created event', async () => {
+    it('should trigger ingestion for repos found in database', async () => {
       vi.mocked(verify).mockResolvedValue(true);
+      // Mock DB returning one matching repo (use createWhereResult for chainable mock)
+      mockDbWhere.mockReturnValue(
+        createWhereResult([
+          { id: 'uuid-1', githubId: 1, fullName: 'test-org/repo1' },
+        ]),
+      );
 
       const req = createWebhookRequest(installationPayload, {
         signature: 'sha256=valid',
@@ -266,7 +337,41 @@ describe('GitHub Webhook Routes', () => {
 
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data).toEqual({ message: 'Installation created processed' });
+      expect(data).toEqual({
+        message: 'Installation created and captured',
+        installationId: 'mock-installation-uuid',
+        autoLinked: false,
+        triggered: 1,
+        skipped: 1,
+      });
+      expect(tasks.trigger).toHaveBeenCalledWith('ingest-repo', {
+        repoId: 'uuid-1',
+      });
+    });
+
+    it('should skip repos not found in database', async () => {
+      vi.mocked(verify).mockResolvedValue(true);
+      // Mock DB returning no matching repos (use createWhereResult for chainable mock)
+      mockDbWhere.mockReturnValue(createWhereResult([]));
+
+      const req = createWebhookRequest(installationPayload, {
+        signature: 'sha256=valid',
+        eventType: 'installation',
+        deliveryId: 'install-123',
+      });
+
+      const res = await app.request(req);
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toEqual({
+        message: 'Installation created and captured',
+        installationId: 'mock-installation-uuid',
+        autoLinked: false,
+        triggered: 0,
+        skipped: 2,
+      });
+      expect(tasks.trigger).not.toHaveBeenCalled();
     });
 
     it('should handle installation deleted event', async () => {
@@ -303,8 +408,14 @@ describe('GitHub Webhook Routes', () => {
       repositories_removed: [],
     };
 
-    it('should handle repositories added event', async () => {
+    it('should trigger ingestion for added repos found in database', async () => {
       vi.mocked(verify).mockResolvedValue(true);
+      // Mock DB returning matching repo (use createWhereResult for chainable mock)
+      mockDbWhere.mockReturnValue(
+        createWhereResult([
+          { id: 'uuid-3', githubId: 3, fullName: 'test-org/repo3' },
+        ]),
+      );
 
       const req = createWebhookRequest(repoChangePayload, {
         signature: 'sha256=valid',
@@ -316,7 +427,39 @@ describe('GitHub Webhook Routes', () => {
 
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data).toEqual({ message: 'Repository added processed' });
+      expect(data).toEqual({
+        message: 'Repository added processed',
+        cacheUpdated: true,
+        triggered: 1,
+        skipped: 0,
+      });
+      expect(tasks.trigger).toHaveBeenCalledWith('ingest-repo', {
+        repoId: 'uuid-3',
+      });
+    });
+
+    it('should skip added repos not found in database', async () => {
+      vi.mocked(verify).mockResolvedValue(true);
+      // Mock DB returning no matching repos (use createWhereResult for chainable mock)
+      mockDbWhere.mockReturnValue(createWhereResult([]));
+
+      const req = createWebhookRequest(repoChangePayload, {
+        signature: 'sha256=valid',
+        eventType: 'installation_repositories',
+        deliveryId: 'repos-123',
+      });
+
+      const res = await app.request(req);
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toEqual({
+        message: 'Repository added processed',
+        cacheUpdated: true,
+        triggered: 0,
+        skipped: 1,
+      });
+      expect(tasks.trigger).not.toHaveBeenCalled();
     });
 
     it('should handle repositories removed event', async () => {
@@ -340,7 +483,10 @@ describe('GitHub Webhook Routes', () => {
 
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data).toEqual({ message: 'Repository removed processed' });
+      expect(data).toEqual({
+        message: 'Repository removed processed',
+        cacheUpdated: true,
+      });
     });
   });
 

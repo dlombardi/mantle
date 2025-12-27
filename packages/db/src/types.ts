@@ -112,9 +112,29 @@ export type PatternEvolutionStatus =
 export const evidenceSourceEnum = ['extraction', 'human'] as const;
 export type EvidenceSource = (typeof evidenceSourceEnum)[number];
 
+export const installationAccountTypeEnum = ['User', 'Organization'] as const;
+export type InstallationAccountType =
+  (typeof installationAccountTypeEnum)[number];
+
+export const membershipDiscoveryEnum = [
+  'personal_match',
+  'org_api_check',
+  'migration',
+] as const;
+export type MembershipDiscovery = (typeof membershipDiscoveryEnum)[number];
+
 // ============================================
 // JSONB TYPES (stored as JSON in Postgres)
 // ============================================
+
+/**
+ * Cached repo info stored in github_installations.repositories_cache
+ */
+export interface CachedRepo {
+  id: number;
+  fullName: string;
+  private: boolean;
+}
 
 /**
  * 4-dimensional confidence scoring for code patterns (D11)

@@ -11,13 +11,59 @@ import { TRPCError } from '@trpc/server';
 import type { Context } from './context';
 
 /**
+ * Create a chainable mock result for Drizzle query builder pattern.
+ * Supports full query chain: select().from().where().orderBy().limit().offset()
+ */
+function createChainableMock<T>(result: T) {
+  const chain = {
+    from: () => chain,
+    where: () => chain,
+    orderBy: () => chain,
+    limit: () => chain,
+    offset: () => Promise.resolve(result),
+    // Make the chain thenable so it can be awaited at any point
+    then: (resolve: (value: T) => void) => Promise.resolve(result).then(resolve),
+  };
+  return chain;
+}
+
+/**
+ * Create a mock database for testing.
+ * Provides chainable query builders that return configurable results.
+ */
+function createMockDb(options: {
+  selectResult?: unknown[];
+  deleteResult?: unknown[];
+} = {}) {
+  return {
+    select: () => createChainableMock(options.selectResult ?? []),
+    delete: () => ({
+      where: () => Promise.resolve(options.deleteResult ?? []),
+    }),
+    insert: () => ({
+      values: () => ({
+        returning: () => Promise.resolve([]),
+        onConflictDoUpdate: () => ({
+          returning: () => Promise.resolve([]),
+        }),
+      }),
+    }),
+    update: () => ({
+      set: () => ({
+        where: () => Promise.resolve([]),
+      }),
+    }),
+  } as unknown as Context['db'];
+}
+
+/**
  * Create a mock tRPC context for testing.
  *
  * @param overrides - Optional context overrides
  */
 function createMockContext(overrides: Partial<Context> = {}): Context {
   return {
-    db: {} as Context['db'], // Mock database
+    db: createMockDb(),
     user: null,
     req: new Request('http://localhost/trpc'),
     ...overrides,
@@ -108,13 +154,29 @@ describe('appRouter', () => {
     });
 
     describe('disconnect', () => {
-      it('returns success', async () => {
-        const caller = appRouter.createCaller(createAuthenticatedContext());
-        const result = await caller.repos.disconnect({
-          id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      it('returns success with repo fullName', async () => {
+        const repoId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+        // Create context with mock db that returns the repo
+        const mockDb = createMockDb({
+          selectResult: [{ id: repoId, fullName: 'acme/widgets' }],
         });
+        const caller = appRouter.createCaller(
+          createAuthenticatedContext('test-user-id', { db: mockDb }),
+        );
+
+        const result = await caller.repos.disconnect({ id: repoId });
 
         expect(result.success).toBe(true);
+        expect(result.fullName).toBe('acme/widgets');
+      });
+
+      it('throws NOT_FOUND when repo does not exist', async () => {
+        // Default mock db returns empty array (no repo found)
+        const caller = appRouter.createCaller(createAuthenticatedContext());
+
+        await expect(
+          caller.repos.disconnect({ id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479' }),
+        ).rejects.toThrow(TRPCError);
       });
     });
 

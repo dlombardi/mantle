@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
-import { RepoSelectorModal, type SelectorRepo } from './repo-selector-modal';
+import { RepoSelectorModal, type SelectorRepo, type ReposByInstallation } from './repo-selector-modal';
 import { Button } from './ui/button';
 
 const sampleRepos: SelectorRepo[] = [
-  { id: 1, fullName: 'dlombardi/new-project', defaultBranch: 'main', private: false, status: 'available' },
-  { id: 2, fullName: 'dlombardi/side-project', defaultBranch: 'main', private: true, status: 'available' },
-  { id: 3, fullName: 'dlombardi/experiment', defaultBranch: 'master', private: false, status: 'available' },
-  { id: 4, fullName: 'dlombardi/api-server', defaultBranch: 'main', private: false, status: 'connected' },
-  { id: 5, fullName: 'dlombardi/frontend', defaultBranch: 'main', private: false, status: 'analyzing' },
+  { id: 1, fullName: 'dlombardi/new-project', defaultBranch: 'main', private: false, status: 'available', installationId: 123, installationAccount: 'dlombardi', installationType: 'User' },
+  { id: 2, fullName: 'dlombardi/side-project', defaultBranch: 'main', private: true, status: 'available', installationId: 123, installationAccount: 'dlombardi', installationType: 'User' },
+  { id: 3, fullName: 'dlombardi/experiment', defaultBranch: 'master', private: false, status: 'available', installationId: 123, installationAccount: 'dlombardi', installationType: 'User' },
+  { id: 4, fullName: 'dlombardi/api-server', defaultBranch: 'main', private: false, status: 'connected', installationId: 123, installationAccount: 'dlombardi', installationType: 'User' },
+  { id: 5, fullName: 'dlombardi/frontend', defaultBranch: 'main', private: false, status: 'analyzing', installationId: 123, installationAccount: 'dlombardi', installationType: 'User' },
 ];
 
 const meta = {
@@ -84,12 +84,13 @@ export const Interactive: Story = {
     const [open, setOpen] = useState(false);
     const [connecting, setConnecting] = useState(false);
 
-    const handleConnect = (ids: number[]) => {
+    const handleConnect = (reposByInstallation: ReposByInstallation[]) => {
       setConnecting(true);
+      const allRepoIds = reposByInstallation.flatMap((group) => group.repoIds);
       setTimeout(() => {
         setConnecting(false);
         setOpen(false);
-        alert(`Connected repos: ${ids.join(', ')}`);
+        alert(`Connected repos: ${allRepoIds.join(', ')}`);
       }, 1500);
     };
 
@@ -121,6 +122,9 @@ export const ManyRepos: Story = {
         defaultBranch: 'main',
         private: i % 3 === 0,
         status: 'available' as const,
+        installationId: 123,
+        installationAccount: 'dlombardi',
+        installationType: 'User' as const,
       })),
       ...sampleRepos.filter((r) => r.status !== 'available'),
     ],
@@ -128,19 +132,35 @@ export const ManyRepos: Story = {
   },
 };
 
-/** Search functionality demo */
+/** Multi-installation demo showing repos grouped by account */
+export const MultiInstallation: Story = {
+  args: {
+    repos: [
+      // Personal repos
+      { id: 1, fullName: 'dlombardi/personal-project', defaultBranch: 'main', private: false, status: 'available', installationId: 123, installationAccount: 'dlombardi', installationType: 'User', installationAvatarUrl: 'https://avatars.githubusercontent.com/u/12345?v=4' },
+      { id: 2, fullName: 'dlombardi/my-app', defaultBranch: 'main', private: true, status: 'available', installationId: 123, installationAccount: 'dlombardi', installationType: 'User', installationAvatarUrl: 'https://avatars.githubusercontent.com/u/12345?v=4' },
+      // Org repos
+      { id: 3, fullName: 'acme-corp/shared-lib', defaultBranch: 'main', private: true, status: 'available', installationId: 456, installationAccount: 'acme-corp', installationType: 'Organization', installationAvatarUrl: 'https://avatars.githubusercontent.com/u/67890?v=4' },
+      { id: 4, fullName: 'acme-corp/api-gateway', defaultBranch: 'main', private: true, status: 'available', installationId: 456, installationAccount: 'acme-corp', installationType: 'Organization', installationAvatarUrl: 'https://avatars.githubusercontent.com/u/67890?v=4' },
+      { id: 5, fullName: 'acme-corp/frontend', defaultBranch: 'main', private: true, status: 'connected', installationId: 456, installationAccount: 'acme-corp', installationType: 'Organization', installationAvatarUrl: 'https://avatars.githubusercontent.com/u/67890?v=4' },
+    ],
+    permissionsUrl: 'https://github.com/settings/installations',
+  },
+};
+
+/** Search functionality demo with multiple installations */
 export const WithSearch: Story = {
   args: {
     open: false,
   },
   render: () => {
     const manyRepos: SelectorRepo[] = [
-      { id: 1, fullName: 'dlombardi/react-app', defaultBranch: 'main', private: false, status: 'available' },
-      { id: 2, fullName: 'dlombardi/vue-project', defaultBranch: 'main', private: false, status: 'available' },
-      { id: 3, fullName: 'dlombardi/angular-demo', defaultBranch: 'main', private: false, status: 'available' },
-      { id: 4, fullName: 'dlombardi/svelte-kit', defaultBranch: 'main', private: true, status: 'available' },
-      { id: 5, fullName: 'company/shared-components', defaultBranch: 'main', private: true, status: 'connected' },
-      { id: 6, fullName: 'company/design-system', defaultBranch: 'main', private: true, status: 'analyzing' },
+      { id: 1, fullName: 'dlombardi/react-app', defaultBranch: 'main', private: false, status: 'available', installationId: 123, installationAccount: 'dlombardi', installationType: 'User' },
+      { id: 2, fullName: 'dlombardi/vue-project', defaultBranch: 'main', private: false, status: 'available', installationId: 123, installationAccount: 'dlombardi', installationType: 'User' },
+      { id: 3, fullName: 'dlombardi/angular-demo', defaultBranch: 'main', private: false, status: 'available', installationId: 123, installationAccount: 'dlombardi', installationType: 'User' },
+      { id: 4, fullName: 'dlombardi/svelte-kit', defaultBranch: 'main', private: true, status: 'available', installationId: 123, installationAccount: 'dlombardi', installationType: 'User' },
+      { id: 5, fullName: 'company/shared-components', defaultBranch: 'main', private: true, status: 'connected', installationId: 456, installationAccount: 'company', installationType: 'Organization' },
+      { id: 6, fullName: 'company/design-system', defaultBranch: 'main', private: true, status: 'analyzing', installationId: 456, installationAccount: 'company', installationType: 'Organization' },
     ];
 
     return (
@@ -152,7 +172,7 @@ export const WithSearch: Story = {
           open={true}
           onOpenChange={() => {}}
           repos={manyRepos}
-          onConnect={(ids) => alert(`Connect: ${ids}`)}
+          onConnect={(groups) => alert(`Connect: ${groups.flatMap(g => g.repoIds).join(', ')}`)}
           permissionsUrl="https://github.com/settings/installations"
         />
       </div>

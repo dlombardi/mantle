@@ -28,6 +28,9 @@
 // Router and types
 export { appRouter, type AppRouter } from './router';
 
+// GitHub router utilities (for trigger.dev integration)
+export { setTriggerTasks } from './routers/github.router';
+
 // Context
 export { createContext, type Context, type User, type CreateContextOptions } from './context';
 

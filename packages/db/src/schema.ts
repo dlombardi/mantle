@@ -34,7 +34,10 @@ import {
   contextFileSyncStatusEnum,
   patternEvolutionStatusEnum,
   evidenceSourceEnum,
+  installationAccountTypeEnum,
+  membershipDiscoveryEnum,
 } from './types';
+import type { CachedRepo } from './types';
 
 // ============================================
 // POSTGRES ENUMS
@@ -72,6 +75,14 @@ export const patternEvolutionStatus = pgEnum(
   patternEvolutionStatusEnum,
 );
 export const evidenceSource = pgEnum('evidence_source', evidenceSourceEnum);
+export const installationAccountType = pgEnum(
+  'installation_account_type',
+  installationAccountTypeEnum,
+);
+export const membershipDiscovery = pgEnum(
+  'membership_discovery',
+  membershipDiscoveryEnum,
+);
 
 // ============================================
 // TABLE 1: USERS
@@ -556,12 +567,96 @@ export const patternEvolutionRequests = pgTable(
 );
 
 // ============================================
+// TABLE 13: GITHUB_INSTALLATIONS
+// ============================================
+
+export const githubInstallations = pgTable(
+  'github_installations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+
+    // GitHub identifiers
+    installationId: bigint('installation_id', { mode: 'number' })
+      .notNull()
+      .unique(),
+    accountId: bigint('account_id', { mode: 'number' }).notNull(),
+    accountLogin: text('account_login').notNull(),
+    accountType: installationAccountType('account_type').notNull(),
+    accountAvatarUrl: text('account_avatar_url'),
+
+    // Installation state
+    isActive: boolean('is_active').notNull().default(true),
+    suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+
+    // Cached repo list (JSONB for flexibility)
+    repositoriesCache: jsonb('repositories_cache')
+      .$type<CachedRepo[]>()
+      .notNull()
+      .default([]),
+    repositoriesCacheUpdatedAt: timestamp('repositories_cache_updated_at', {
+      withTimezone: true,
+    }),
+
+    // Timestamps
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_installations_installation_id').on(table.installationId),
+    index('idx_installations_account_id').on(table.accountId),
+    index('idx_installations_account_login').on(table.accountLogin),
+  ],
+);
+
+// ============================================
+// TABLE 14: INSTALLATION_MEMBERS
+// ============================================
+
+export const installationMembers = pgTable(
+  'installation_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+
+    installationId: uuid('installation_id')
+      .notNull()
+      .references(() => githubInstallations.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+
+    // Role (for future permissions model)
+    role: text('role').notNull().default('member'),
+
+    // How this membership was discovered
+    discoveredVia: membershipDiscovery('discovered_via').notNull(),
+
+    // Timestamps
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('idx_installation_members_unique').on(
+      table.installationId,
+      table.userId,
+    ),
+    index('idx_installation_members_user').on(table.userId),
+  ],
+);
+
+// ============================================
 // RELATIONS (for Drizzle query builder)
 // ============================================
 
 export const usersRelations = relations(users, ({ many }) => ({
   repos: many(repos),
   ownedPatterns: many(patterns, { relationName: 'patternOwner' }),
+  installationMemberships: many(installationMembers),
 }));
 
 export const reposRelations = relations(repos, ({ one, many }) => ({
@@ -615,3 +710,24 @@ export const violationsRelations = relations(violations, ({ one }) => ({
     references: [patterns.id],
   }),
 }));
+
+export const githubInstallationsRelations = relations(
+  githubInstallations,
+  ({ many }) => ({
+    members: many(installationMembers),
+  }),
+);
+
+export const installationMembersRelations = relations(
+  installationMembers,
+  ({ one }) => ({
+    installation: one(githubInstallations, {
+      fields: [installationMembers.installationId],
+      references: [githubInstallations.id],
+    }),
+    user: one(users, {
+      fields: [installationMembers.userId],
+      references: [users.id],
+    }),
+  }),
+);

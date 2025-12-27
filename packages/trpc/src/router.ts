@@ -9,6 +9,7 @@ import { router, publicProcedure } from './trpc';
 import { reposRouter } from './routers/repos.router';
 import { patternsRouter } from './routers/patterns.router';
 import { githubRouter } from './routers/github.router';
+import { installationsRouter } from './routers/installations.router';
 
 /**
  * Main application router.
@@ -16,6 +17,7 @@ import { githubRouter } from './routers/github.router';
  * All feature routers are merged here under their namespace:
  * - repos.list, repos.getById, etc.
  * - patterns.list, patterns.updateStatus, etc.
+ * - installations.list, installations.discoverInstallations, etc.
  */
 export const appRouter = router({
   // Health check procedure (public, for testing tRPC is working)
@@ -27,6 +29,7 @@ export const appRouter = router({
   repos: reposRouter,
   patterns: patternsRouter,
   github: githubRouter,
+  installations: installationsRouter,
 
   // Future routers:
   // violations: violationsRouter,
