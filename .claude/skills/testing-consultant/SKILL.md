@@ -437,14 +437,3 @@ This skill covers **unit, integration, and E2E tests** (Phase 2). QA verificatio
 - ❌ Unit tests passing does NOT mean Phase 3 can be skipped
 - Phase 3 catches integration issues (real auth, real database, real deployment)
 
----
-
-## Handoffs
-
-| Upstream | When |
-|----------|------|
-| `orchestrator-specialist` | Routes testing tasks here |
-| `api-backend` | After implementing services/APIs/routes |
-| `frontend-architect` | After implementing components |
-
-Tests are typically the final step in a feature workflow.

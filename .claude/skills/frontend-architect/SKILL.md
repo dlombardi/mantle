@@ -385,65 +385,6 @@ bun run build        # Production build
 bun run dev          # Development server (port 3000)
 ```
 
----
-
-## Phase 2 Completion Checklist
-
-When implementing a bead, complete ALL items before considering Phase 2 done:
-
-- [ ] Code changes implemented per `plan.md`
-- [ ] Storybook stories created for any new components (sibling `.stories.tsx` files)
-- [ ] Unit/component tests written and passing
-- [ ] TypeScript and lint checks pass
-- [ ] `.beads/artifacts/<bead-id>/qa-checklist.md` created (see template below)
-- [ ] Changes committed and pushed to trigger preview deployment
-
-**Then transition to Phase 3:**
-```bash
-bd label add <bead-id> phase:verifying
-```
-
-**HANDOFF TO: qa-workflow** - Do NOT close the bead until Phase 3 completes.
-
-### qa-checklist.md Template
-
-```markdown
-# QA Checklist: <bead-title>
-
-## Prerequisites
-- [ ] Preview deployment is live
-- [ ] Test user can access the preview URL
-
-## Functional Tests
-1. [ ] <Step 1 description>
-2. [ ] <Step 2 description>
-3. [ ] <Expected outcome>
-
-## Edge Cases
-- [ ] <Edge case 1>
-- [ ] <Edge case 2>
-
-## Regression Checks
-- [ ] Existing functionality still works
-- [ ] No console errors
-```
-
----
-
-## Handoffs
-
-| Downstream | When |
-|------------|------|
-| `testing-consultant` | For component tests |
-| `api-backend` | When UI needs new API endpoints |
-| `qa-workflow` | After Phase 2 complete, for verification |
-
-| Upstream | When |
-|----------|------|
-| `orchestrator-specialist` | Routes UI tasks here |
-
----
-
 ## Design Companion
 
 For visual polish beyond structural patterns, also read `frontend-design`:

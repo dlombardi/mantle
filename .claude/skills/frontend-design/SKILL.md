@@ -131,12 +131,3 @@ AVOID these for Reasoning Substrate:
 bun run dev       # Visual inspection
 bun run build     # No CSS errors
 ```
-
----
-
-## Handoffs
-
-| Skill | When |
-|-------|------|
-| `frontend-architect` | Read together for structure |
-| `testing-consultant` | Visual regression tests |
